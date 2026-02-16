@@ -241,33 +241,9 @@ useEffect(() => {
   // --- NUEVO: Función para salir ---
   const handleLogout = async () => {
     await signOut(auth);
-  }; // Esta es la única llave que debe cerrar el logout
-
-  const guardarPlan = async () => {
-    if (!datos.nombre || datos.nombre.trim() === "") {
-      return alert("⚠️ Por favor, ingresa el nombre del paciente antes de guardar.");
-    }
-
-    try {
-      const pautaID = `${datos.nombre.replace(/\s+/g, '_')}-${Date.now()}`;
-      const pautaRef = doc(db, "pautas", pautaID);
-
-      await setDoc(pautaRef, {
-        paciente: datos.nombre,
-        profesional: nutriNombre,
-        fecha: new Date().toISOString(),
-        caloriasMeta: metaCal,
-        macros: totales,
-        alimentos: grid,
-        observaciones: observaciones
-      });
-
-      alert("✅ ¡Plan de " + datos.nombre + " guardado con éxito!");
-    } catch (error) {
-      console.error("Error al guardar:", error);
-      alert("❌ Error al guardar en la base de datos.");
-    }
-  }; // Esta cierra el guardarPlan
+    // Opcional: Limpiar datos al salir
+    // setDatos({...}); 
+  };
   const [datos, setDatos] = useState({ 
     nombre: "", peso: "", altura: "", edad: "", genero: "masculino", 
     actividad: "sedentario", objetivo: "bajar", estrategia: "equilibrada",
@@ -1139,13 +1115,6 @@ ${firma}`;
                             <button onClick={imprimirProfesional} className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-bold shadow transition flex items-center justify-center gap-2 text-xs">
                                 <span>🖨️</span> Imprimir / PDF
                             </button>
-                        {/* PEGALO AQUÍ (Ahora línea 1118) */}
-                        <button 
-                            onClick={guardarPlan}
-                            className="w-full mt-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg font-bold flex items-center justify-center gap-2 shadow-sm transition-all"
-                        >
-                            <span>💾</span> Guardar en Sistema
-                        </button>
                         </div>
                     </div>
                     
