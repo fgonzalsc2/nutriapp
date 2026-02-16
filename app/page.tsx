@@ -6,15 +6,15 @@ import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from
 import { Eye, EyeOff, Lock, User, LogOut } from "lucide-react";
 
 // --- NUEVO: Configuración de Firebase ---
+// --- CONFIGURACIÓN REAL DE TU PROYECTO (Copiada de tu foto) ---
 const firebaseConfig = {
-  // ⚠️ BORRA ESTO Y PEGA AQUÍ EL CÓDIGO QUE COPIASTE DE GOOGLE (el que tiene apiKey)
-  apiKey: "TU_API_KEY_AQUI",
-  authDomain: "TU_PROJECT.firebaseapp.com",
-  projectId: "TU_PROJECT_ID",
-  storageBucket: "TU_BUCKET",
-  messagingSenderId: "TU_SENDER_ID",
-  appId: "TU_APP_ID"
-};
+    apiKey: "AIzaSyCjeI7Om5Qqlxcga-O0k_jaqCL8cHbCaNk",
+    authDomain: "nutriapp-94e6b.firebaseapp.com",
+    projectId: "nutriapp-94e6b",
+    storageBucket: "nutriapp-94e6b.firebasestorage.app",
+    messagingSenderId: "403128573577",
+    appId: "1:403128573577:web:6548324a8c7e93db193058"
+  };
 
 // Iniciamos la conexión
 const app = initializeApp(firebaseConfig);
@@ -844,10 +844,11 @@ ${firma}`;
   if (loading) return <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400">Cargando seguridad...</div>;
 
   // --- NUEVO: Si NO hay usuario, muestra pantalla de Login ---
-  if (!user) {
+ // --- Si NO hay usuario, muestra Login (VERSIÓN ALTO CONTRASTE) ---
+ if (!user) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white max-w-sm w-full rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-white max-w-sm w-full rounded-2xl shadow-xl overflow-hidden border border-slate-200">
           <div className="bg-blue-600 p-8 text-center">
             <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
               <Lock className="w-8 h-8 text-white" />
@@ -858,26 +859,50 @@ ${firma}`;
           
           <form onSubmit={handleLogin} className="p-8 space-y-5">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Correo</label>
+              <label className="block text-xs font-black text-black uppercase mb-1 tracking-wide">Correo Electrónico</label>
               <div className="relative">
-                <User className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none focus:border-blue-500" placeholder="usuario@ejemplo.com" />
+                <User className="absolute left-3 top-2.5 w-4 h-4 text-black" />
+                <input 
+                  type="email" 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)} 
+                  className="w-full pl-9 pr-3 py-2 border-2 border-slate-300 rounded-lg text-sm text-black font-bold outline-none focus:border-blue-600 placeholder:text-slate-400" 
+                  placeholder="usuario@ejemplo.com" 
+                />
               </div>
             </div>
+
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contraseña</label>
+              <label className="block text-xs font-black text-black uppercase mb-1 tracking-wide">Contraseña</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                <input type={verClave ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-9 pr-10 py-2 border rounded-lg text-sm outline-none focus:border-blue-500" placeholder="••••••••" />
-                <button type="button" onClick={() => setVerClave(!verClave)} className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
+                <Lock className="absolute left-3 top-2.5 w-4 h-4 text-black" />
+                <input 
+                  type={verClave ? "text" : "password"} 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  className="w-full pl-9 pr-10 py-2 border-2 border-slate-300 rounded-lg text-sm text-black font-bold outline-none focus:border-blue-600 placeholder:text-slate-400" 
+                  placeholder="••••••••" 
+                />
+                <button type="button" onClick={() => setVerClave(!verClave)} className="absolute right-3 top-2.5 text-slate-500 hover:text-black">
                   {verClave ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
-            {errorLogin && <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg font-bold flex gap-2"><span>⚠️</span> {errorLogin}</div>}
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition-all">Ingresar</button>
+
+            {errorLogin && (
+              <div className="p-3 bg-red-100 border-2 border-red-200 rounded-lg flex items-center gap-2 animate-pulse">
+                <span className="text-red-700 font-bold text-xs">{errorLogin}</span>
+              </div>
+            )}
+
+            <button type="submit" className="w-full bg-blue-700 hover:bg-blue-800 text-white font-black py-3 rounded-lg shadow-lg transition-all active:scale-[0.98]">
+              INGRESAR AL SISTEMA
+            </button>
           </form>
-          <div className="bg-slate-50 p-3 text-center text-[10px] text-slate-400">Protegido por Google Firebase</div>
+          
+          <div className="bg-slate-50 p-4 text-center border-t border-slate-200">
+            <p className="text-[10px] text-slate-500 font-medium">Protegido por Google Firebase Security™</p>
+          </div>
         </div>
       </div>
     );
