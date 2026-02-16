@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 // --- NUEVO: Importamos herramientas de Firebase ---
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+// --- NUEVO: Herramientas para el bloqueo de sesión ---
+import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "firebase/firestore";
 import { Eye, EyeOff, Lock, User, LogOut } from "lucide-react";
 
 // --- NUEVO: Configuración de Firebase ---
@@ -19,6 +21,7 @@ const firebaseConfig = {
 // Iniciamos la conexión
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
 
 // (Aquí abajo sigue tu código normal: const MACROS_PORCION...)
 
