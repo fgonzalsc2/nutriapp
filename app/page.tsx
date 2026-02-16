@@ -185,13 +185,45 @@ export default function Home() {
   const [errorLogin, setErrorLogin] = useState("");
   const [verClave, setVerClave] = useState(false);
 
-  // --- NUEVO: Escuchar si hay usuario conectado ---
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+// --- MONITOR DE SESIÓN ÚNICA (Solo deja 1 abierto) ---
+useEffect(() => {
+    let unsubscribeSnapshot: any = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        // 1. Creamos un código único para esta pestaña actual
+        const sessionID = Math.random().toString(36).substring(7);
+        localStorage.setItem("session_token", sessionID);
+
+        // 2. Anotamos en Google: "Felipe está usando el token X"
+        const userRef = doc(db, "active_sessions", currentUser.uid);
+        await setDoc(userRef, { lastSession: sessionID, email: currentUser.email }, { merge: true });
+
+        // 3. Miramos el libro de visitas: si el token cambia, ¡fuera!
+        unsubscribeSnapshot = onSnapshot(userRef, (doc) => {
+          if (doc.exists()) {
+            const data = doc.data();
+            const localToken = localStorage.getItem("session_token");
+            
+            if (data.lastSession !== localToken) {
+              alert("⚠️ SESIÓN CERRADA: Se ha iniciado sesión en otro dispositivo.");
+              handleLogout();
+            }
+          }
+        });
+
+        setUser(currentUser);
+      } else {
+        setUser(null);
+        if (unsubscribeSnapshot) unsubscribeSnapshot();
+      }
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+    };
   }, []);
 
   // --- NUEVO: Función para iniciar sesión ---
