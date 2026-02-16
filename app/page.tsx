@@ -1,5 +1,26 @@
 "use client";
 import { useState, useEffect } from "react";
+// --- NUEVO: Importamos herramientas de Firebase ---
+import { initializeApp } from "firebase/app";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import { Eye, EyeOff, Lock, User, LogOut } from "lucide-react";
+
+// --- NUEVO: Configuración de Firebase ---
+const firebaseConfig = {
+  // ⚠️ BORRA ESTO Y PEGA AQUÍ EL CÓDIGO QUE COPIASTE DE GOOGLE (el que tiene apiKey)
+  apiKey: "TU_API_KEY_AQUI",
+  authDomain: "TU_PROJECT.firebaseapp.com",
+  projectId: "TU_PROJECT_ID",
+  storageBucket: "TU_BUCKET",
+  messagingSenderId: "TU_SENDER_ID",
+  appId: "TU_APP_ID"
+};
+
+// Iniciamos la conexión
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+// (Aquí abajo sigue tu código normal: const MACROS_PORCION...)
 
 // --- 1. DATA CIENTÍFICA ---
 const MACROS_PORCION = {
@@ -153,6 +174,41 @@ function Input({ label, ...props }: any) { return <div className="flex flex-col 
 function Select({ label, children, ...props }: any) { return <div className="flex flex-col gap-1 w-full"><label className="text-slate-500 font-bold text-[10px] uppercase tracking-wide">{label}</label><select className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-600 bg-white" {...props}>{children}</select></div>; }
 
 export default function Home() {
+    // --- NUEVO: Estado de Sesión ---
+  const [user, setUser] = useState<any>(null); // Guarda al usuario conectado
+  const [loading, setLoading] = useState(true); // Para mostrar "Cargando..."
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorLogin, setErrorLogin] = useState("");
+  const [verClave, setVerClave] = useState(false);
+
+  // --- NUEVO: Escuchar si hay usuario conectado ---
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // --- NUEVO: Función para iniciar sesión ---
+  const handleLogin = async (e: any) => {
+    e.preventDefault();
+    setErrorLogin("");
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (error: any) {
+      if (error.code === 'auth/invalid-credential') setErrorLogin("🚫 Correo o clave incorrectos");
+      else setErrorLogin("❌ Error de conexión.");
+    }
+  };
+
+  // --- NUEVO: Función para salir ---
+  const handleLogout = async () => {
+    await signOut(auth);
+    // Opcional: Limpiar datos al salir
+    // setDatos({...}); 
+  };
   const [datos, setDatos] = useState({ 
     nombre: "", peso: "", altura: "", edad: "", genero: "masculino", 
     actividad: "sedentario", objetivo: "bajar", estrategia: "equilibrada",
@@ -784,12 +840,100 @@ ${firma}`;
   };
   
   const diagVisual = getDiagnosticoTiempoReal();
+// --- NUEVO: Si está cargando, muestra espera ---
+  if (loading) return <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400">Cargando seguridad...</div>;
 
+  // --- NUEVO: Si NO hay usuario, muestra pantalla de Login ---
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white max-w-sm w-full rounded-2xl shadow-xl overflow-hidden">
+          <div className="bg-blue-600 p-8 text-center">
+            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+              <Lock className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-1">NutriPlanner</h1>
+            <p className="text-blue-100 text-xs">Acceso Restringido</p>
+          </div>
+          
+          <form onSubmit={handleLogin} className="p-8 space-y-5">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Correo</label>
+              <div className="relative">
+                <User className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none focus:border-blue-500" placeholder="usuario@ejemplo.com" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contraseña</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                <input type={verClave ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-9 pr-10 py-2 border rounded-lg text-sm outline-none focus:border-blue-500" placeholder="••••••••" />
+                <button type="button" onClick={() => setVerClave(!verClave)} className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
+                  {verClave ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            {errorLogin && <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg font-bold flex gap-2"><span>⚠️</span> {errorLogin}</div>}
+            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition-all">Ingresar</button>
+          </form>
+          <div className="bg-slate-50 p-3 text-center text-[10px] text-slate-400">Protegido por Google Firebase</div>
+        </div>
+      </div>
+    );
+  }
+  // --- NUEVO: Si está cargando, muestra espera ---
+  if (loading) return <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400">Cargando seguridad...</div>;
+
+  // --- NUEVO: Si NO hay usuario, muestra pantalla de Login ---
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white max-w-sm w-full rounded-2xl shadow-xl overflow-hidden">
+          <div className="bg-blue-600 p-8 text-center">
+            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+              <Lock className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-1">NutriPlanner</h1>
+            <p className="text-blue-100 text-xs">Acceso Restringido</p>
+          </div>
+          
+          <form onSubmit={handleLogin} className="p-8 space-y-5">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Correo</label>
+              <div className="relative">
+                <User className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none focus:border-blue-500" placeholder="usuario@ejemplo.com" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contraseña</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                <input type={verClave ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-9 pr-10 py-2 border rounded-lg text-sm outline-none focus:border-blue-500" placeholder="••••••••" />
+                <button type="button" onClick={() => setVerClave(!verClave)} className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
+                  {verClave ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            {errorLogin && <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg font-bold flex gap-2"><span>⚠️</span> {errorLogin}</div>}
+            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition-all">Ingresar</button>
+          </form>
+          <div className="bg-slate-50 p-3 text-center text-[10px] text-slate-400">Protegido por Google Firebase</div>
+        </div>
+      </div>
+    );
+  }
   return (
     <main className="min-h-screen bg-slate-100 py-8 px-4 font-sans text-slate-800 flex justify-center">
       <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8">
         <section className="lg:col-span-3 bg-white p-6 rounded-2xl shadow-lg border border-slate-200 h-fit sticky top-4">
-          <h1 className="font-bold text-2xl text-blue-700 mb-2">NutriPlanner Clínico</h1>
+        <div className="flex justify-between items-start">
+                    <h1 className="font-bold text-2xl text-blue-700 mb-2">NutriPlanner Clínico</h1>
+                    <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors" title="Cerrar Sesión">
+                        <LogOut className="w-5 h-5" />
+                    </button>
+                  </div>
           <p className="text-xs text-slate-400 mb-6">Herramienta profesional de cálculo</p>
           
           <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
