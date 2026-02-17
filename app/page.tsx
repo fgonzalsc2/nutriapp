@@ -227,6 +227,45 @@ useEffect(() => {
       if (unsubscribeSnapshot) unsubscribeSnapshot();
     };
   }, []);
+  // --- PEGAR ESTO EN app/page.tsx (Línea aprox 230) ---
+  
+  // Este efecto "escucha" si vienes del historial con datos
+  useEffect(() => {
+    const pautaGuardada = localStorage.getItem("pauta_editar");
+    
+    if (pautaGuardada) {
+      try {
+        const data = JSON.parse(pautaGuardada);
+        
+        // 1. Rellenamos el formulario (Nombre, Peso, etc.)
+        setDatos({
+            nombre: data.paciente || "",
+            peso: data.peso || "",
+            altura: data.altura || "",
+            edad: data.edad || "",
+            genero: data.genero || "Femenino",
+            actividad: data.actividad || "Sedentario",
+            objetivo: data.objetivo || "Déficit (Pérdida de Grasa)",
+            estrategia: data.estrategia || "Equilibrada (Minsal)",
+            restriccion: data.restriccion || "Ninguna"
+        });
+
+        // 2. Rellenamos los alimentos (¡Lo más importante!)
+        if (data.alimentos) {
+            setGrid(data.alimentos);
+        }
+        
+        // 3. Borramos el "encargo" para que no se cargue de nuevo por error
+        localStorage.removeItem("pauta_editar");
+        
+        // 4. Aviso visual
+        // alert("✅ Datos cargados: " + data.paciente); // (Opcional, si te molesta bórralo)
+        
+      } catch (e) {
+        console.error("Error al cargar pauta", e);
+      }
+    }
+  }, []);
 
   // --- NUEVO: Función para iniciar sesión ---
   const handleLogin = async (e: any) => {
@@ -256,6 +295,16 @@ useEffect(() => {
 
       await setDoc(pautaRef, {
         paciente: datos.nombre,
+        // --- PEGAR ESTO AQUÍ ---
+        peso: datos.peso,
+        altura: datos.altura,
+        edad: datos.edad,
+        genero: datos.genero,
+        actividad: datos.actividad,
+        objetivo: datos.objetivo,
+        estrategia: datos.estrategia,
+        restriccion: datos.restriccion,
+        // -----------------------
         profesional: nutriNombre,
         fecha: new Date().toISOString(),
         caloriasMeta: metaCal,
