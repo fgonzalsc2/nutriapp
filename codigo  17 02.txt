@@ -6,10 +6,8 @@ import { useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 // --- Herramientas para base de datos ---
-import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "firebase/firestore";
 import { Eye, EyeOff, Lock, User, LogOut } from "lucide-react";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { Sparkles } from "lucide-react";
 
 // --- Configuración de Firebase ---
 const firebaseConfig = {
@@ -241,46 +239,6 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState(false);
   const [diagnostico, setDiagnostico] = useState({ imc: 0, estado: "", color: "" });
   const [mensajeAlerta, setMensajeAlerta] = useState("");
-
-    // --- LÓGICA DEL CHEF IA ---
-    const [menuIA, setMenuIA] = useState("");
-    const [cargandoIA, setCargandoIA] = useState(false);
-
-    const generarMenuIA = async () => {
-        // Verifica si la clave existe
-        if (!process.env.NEXT_PUBLIC_GEMINI_API_KEY) return alert("Falta la API Key en .env.local");
-        
-        setCargandoIA(true);
-        try {
-            const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-            // Prompt diseñado para Nutricionistas (USANDO 'grid' COMO VARIABLE)
-            const prompt = `
-                Actúa como un Chef Nutricionista experto. Crea un ejemplo de MENÚ DE UN DÍA (Desayuno, Almuerzo, Cena)
-                respetando EXACTAMENTE estas porciones. Sé creativo y apetitoso.
-                
-                - Desayuno: ${grid.desayuno.cereales} cereales, ${grid.desayuno.proteina} proteínas, ${grid.desayuno.lacteos} lácteos, ${grid.desayuno.frutas} fruta.
-                - Almuerzo: ${grid.almuerzo.cereales} cereales, ${grid.almuerzo.proteina} proteínas, ${grid.almuerzo.verduras} verduras, ${grid.almuerzo.grasas} grasas.
-                - Cena: ${grid.cena.cereales} cereales, ${grid.cena.proteina} proteínas, ${grid.cena.verduras} verduras.
-
-                Formato de respuesta:
-                🍳 **Desayuno:** [Nombre del plato] (Ingredientes breves)
-                🍲 **Almuerzo:** [Nombre del plato] (Ingredientes breves)
-                🌙 **Cena:** [Nombre del plato] (Ingredientes breves)
-                
-                No des introducciones, solo el menú.
-            `;
-
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            setMenuIA(response.text());
-        } catch (error) {
-            console.error("Error IA:", error);
-            alert("Error al conectar con el Chef IA. Revisa tu API Key.");
-        }
-        setCargandoIA(false);
-    };
 
   // --- MONITOR DE SESIÓN ÚNICA ---
   useEffect(() => {
@@ -1321,37 +1279,6 @@ ${firma}`;
             </>
           )}
         </section>
-      </div>
-
-      {/* --- ZONA CHEF IA --- */}
-      <div className="mt-8 mx-auto max-w-4xl bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-2xl border border-purple-100 shadow-sm mb-10">
-          <div className="flex justify-between items-center mb-4">
-              <div>
-                  <h3 className="text-purple-900 font-bold flex items-center gap-2 text-lg">
-                      <Sparkles className="w-5 h-5 text-purple-600" /> 
-                      Chef Inteligente
-                  </h3>
-                  <p className="text-xs text-purple-600">Genera ideas de recetas basadas en tus porciones</p>
-              </div>
-              <button 
-                  onClick={generarMenuIA}
-                  disabled={cargandoIA}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition flex items-center gap-2 shadow-lg shadow-purple-200 active:scale-95"
-              >
-                  {cargandoIA ? (
-                      <>⏳ Cocinando...</>
-                  ) : (
-                      <>✨ Crear Menú Ejemplo</>
-                  )}
-              </button>
-          </div>
-
-          {/* RESPUESTA DE LA IA */}
-          {menuIA && (
-              <div className="bg-white p-5 rounded-xl border border-purple-100 text-sm text-slate-700 whitespace-pre-line shadow-inner leading-relaxed animate-in fade-in slide-in-from-bottom-2">
-                  {menuIA}
-              </div>
-          )}
       </div>
     </main>
   );
