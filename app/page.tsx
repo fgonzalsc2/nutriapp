@@ -1,6 +1,6 @@
+"use client";
 import Link from "next/link";
 import { FileText } from "lucide-react";
-"use client";
 import { useState, useEffect } from "react";
 // --- NUEVO: Importamos herramientas de Firebase ---
 import { initializeApp } from "firebase/app";
@@ -1009,7 +1009,7 @@ ${firma}`;
         </div>
       </div>
     );
-  }
+  }  
   return (
     <main className="min-h-screen bg-slate-100 py-8 px-4 font-sans text-slate-800 flex justify-center">
       <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8">
