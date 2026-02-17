@@ -8,7 +8,6 @@ import Link from "next/link";
 import { Trash2, Search, ArrowLeft, FileText, Loader2, Calendar, User, Download } from "lucide-react";
 
 // --- CONFIGURACIÓN FIREBASE ---
-// (Mantenemos tu configuración actual para que siga funcionando directo)
 const firebaseConfig = {
     apiKey: "AIzaSyCjeI7Om5Qqlxcga-O0k_jaqCL8cHbCaNk",
     authDomain: "nutriapp-94e6b.firebaseapp.com",
@@ -61,8 +60,7 @@ export default function HistorialPage() {
             
             const datos = querySnapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() }))
-                // FILTRO DE SEGURIDAD: Solo mis pacientes
-                // Nota: Muestra tus registros Y los antiguos que no tenían dueño (para que no los pierdas hoy)
+                // FILTRO DE SEGURIDAD: Solo mis pacientes + antiguos sin dueño
                 .filter((doc: any) => doc.creadoPor === email || !doc.creadoPor); 
 
             setPautas(datos);
@@ -72,22 +70,31 @@ export default function HistorialPage() {
         setCargando(false);
     };
 
-    // 2. EXPORTAR A EXCEL (CSV)
+    // 2. EXPORTAR A EXCEL (MEJORADO PARA LATINOAMÉRICA - PUNTO Y COMA)
     const exportarExcel = () => {
         if (pautas.length === 0) return alert("No hay datos para exportar.");
 
-        let csvContent = "\uFEFF"; // BOM para que Excel reconozca tildes y eñes
-        csvContent += "Fecha,Hora,Paciente,Estrategia,Peso(kg),Objetivo,Calorias Meta\n";
+        // TRUCO: "sep=;" le dice a Excel que use punto y coma como separador
+        // \uFEFF es el BOM para que reconozca tildes y ñ
+        let csvContent = "\uFEFFsep=;\n"; 
+        csvContent += "Fecha;Hora;Paciente;Estrategia;Peso (kg);Objetivo;Calorias Meta\n";
 
         pautas.forEach(p => {
             const f = new Date(p.fecha);
             const fecha = f.toLocaleDateString('es-CL');
             const hora = f.toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'});
-            // Limpiamos comas del nombre para evitar errores en CSV
-            const nombre = p.paciente.replace(/,/g, ""); 
-            const est = ESTRATEGIAS_LABELS[p.estrategia] || p.estrategia;
             
-            const row = `${fecha},${hora},${nombre},${est},${p.peso},${p.objetivo},${Math.round(p.caloriasMeta)}`;
+            // Limpiamos punto y coma del nombre para evitar errores
+            const nombre = p.paciente ? p.paciente.replace(/;/g, "") : "Sin nombre"; 
+            const est = ESTRATEGIAS_LABELS[p.estrategia] || p.estrategia || "Personalizada";
+            
+            // Manejamos valores vacíos con un guion "-"
+            const peso = p.peso || "-";
+            const objetivo = p.objetivo || "-";
+            const calorias = p.caloriasMeta ? Math.round(p.caloriasMeta) : "0";
+
+            // Usamos ; como separador
+            const row = `${fecha};${hora};${nombre};${est};${peso};${objetivo};${calorias}`;
             csvContent += row + "\n";
         });
 
@@ -95,13 +102,17 @@ export default function HistorialPage() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", `Mis_Pacientes_${user?.email.split('@')[0]}.csv`);
+        // Nombre del archivo con fecha
+        const fechaArchivo = new Date().toISOString().split('T')[0];
+        link.setAttribute("download", `Pacientes_NutriApp_${fechaArchivo}.csv`);
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
     };
 
     // 3. OTRAS FUNCIONES
     const borrarPauta = async (id: string) => {
-        if(!confirm("¿Eliminar este registro?")) return;
+        if(!confirm("¿Eliminar este registro permanentemente?")) return;
         try {
             await deleteDoc(doc(db, "pautas", id));
             setPautas(pautas.filter(p => p.id !== id));
