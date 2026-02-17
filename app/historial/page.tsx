@@ -1,12 +1,13 @@
 "use client";
+import { useRouter } from "next/navigation"; // <--- Importante para viajar al inicio
 import { useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, collection, getDocs, query, orderBy, doc, deleteDoc } from "firebase/firestore";
 import Link from "next/link";
-import { Trash2, Search, ArrowLeft, FileText } from "lucide-react";
+import { Trash2, Search, ArrowLeft, FileText, Loader2 } from "lucide-react";
 
-// --- CONFIGURACIÓN FIREBASE (La misma de siempre) ---
+// --- CONFIGURACIÓN FIREBASE ---
 const firebaseConfig = {
     apiKey: "AIzaSyCjeI7Om5Qqlxcga-O0k_jaqCL8cHbCaNk",
     authDomain: "nutriapp-94e6b.firebaseapp.com",
@@ -21,19 +22,20 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 export default function HistorialPage() {
+    const router = useRouter(); // Hook para navegar
     const [user, setUser] = useState<any>(null);
     const [pautas, setPautas] = useState<any[]>([]);
     const [busqueda, setBusqueda] = useState("");
     const [cargando, setCargando] = useState(true);
 
-    // 1. VERIFICAR SEGURIDAD (Solo entra el Nutri)
+    // 1. VERIFICAR SEGURIDAD
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (usuario) => {
             if (usuario) {
                 setUser(usuario);
-                cargarDatos(); // Si está logueado, cargamos los datos
+                cargarDatos();
             } else {
-                window.location.href = "/"; // Si no, lo mandamos al inicio
+                window.location.href = "/";
             }
         });
         return () => unsubscribe();
@@ -56,23 +58,35 @@ export default function HistorialPage() {
         setCargando(false);
     };
 
-    // 3. FUNCIÓN PARA BORRAR (Por si te equivocas)
+    // 3. FUNCIÓN PARA BORRAR
     const borrarPauta = async (id: string) => {
-        if(!confirm("¿Seguro que quieres borrar este registro?")) return;
+        if(!confirm("¿Seguro que quieres eliminar este registro permanentemente?")) return;
         try {
             await deleteDoc(doc(db, "pautas", id));
-            setPautas(pautas.filter(p => p.id !== id)); // Actualizamos la lista visualmente
+            setPautas(pautas.filter(p => p.id !== id));
         } catch (error) {
             alert("Error al borrar");
         }
     };
 
-    // 4. FILTRO INTELIGENTE (Buscador)
+    // 4. NUEVO: CARGAR EN CALCULADORA
+    const cargarEnCalculadora = (pauta: any) => {
+        // Guardamos los datos en la memoria temporal
+        localStorage.setItem("pauta_editar", JSON.stringify(pauta));
+        // Nos vamos a la calculadora
+        router.push("/");
+    };
+
+    // 5. FILTRO INTELIGENTE
     const pautasFiltradas = pautas.filter(p => 
         p.paciente.toLowerCase().includes(busqueda.toLowerCase())
     );
 
-    if (cargando) return <div className="min-h-screen flex items-center justify-center text-blue-600 font-bold">Cargando tu historial...</div>;
+    if (cargando) return (
+        <div className="min-h-screen flex items-center justify-center text-blue-600 font-bold gap-2">
+            <Loader2 className="animate-spin" /> Cargando historial...
+        </div>
+    );
 
     return (
         <div className="min-h-screen bg-slate-100 p-6 font-sans">
@@ -131,7 +145,7 @@ export default function HistorialPage() {
                                         </td>
                                         <td className="p-4 text-center">
                                             <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold border border-slate-200">
-                                                {Math.round(p.caloriasActuales || 0)} kcal
+                                                {Math.round(p.caloriasActuales || p.caloriasMeta || 0)} kcal
                                             </span>
                                         </td>
                                         <td className="p-4 text-center">
@@ -143,10 +157,20 @@ export default function HistorialPage() {
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="p-4 text-right">
+                                        <td className="p-4 text-right flex justify-end gap-2">
+                                            {/* BOTÓN CARGAR EN CALCULADORA */}
+                                            <button 
+                                                onClick={() => cargarEnCalculadora(p)}
+                                                className="p-2 text-blue-400 hover:text-white hover:bg-blue-500 bg-blue-50 rounded-lg transition border border-blue-100"
+                                                title="Cargar datos para Editar/Imprimir"
+                                            >
+                                                <FileText className="w-4 h-4" />
+                                            </button>
+                                            
+                                            {/* BOTÓN BORRAR */}
                                             <button 
                                                 onClick={() => borrarPauta(p.id)}
-                                                className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                                                className="p-2 text-red-300 hover:text-white hover:bg-red-500 bg-red-50 rounded-lg transition border border-red-100"
                                                 title="Eliminar Registro"
                                             >
                                                 <Trash2 className="w-4 h-4" />
