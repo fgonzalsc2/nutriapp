@@ -46,16 +46,15 @@ export default function PacienteDetalle() {
         if (!email) return;
         
         try {
-            // Buscamos SOLO las fichas de ESTE paciente y ESTE nutri
+            // 1. CAMBIO CLAVE: Quitamos el "orderBy" de aquí para evitar el error de Índice
             const q = query(
                 collection(db, "pautas"), 
-                where("paciente", "==", paciente),
-                orderBy("fecha", "asc") // Importante: Ordenar por fecha para el gráfico
+                where("paciente", "==", paciente)
             );
             
             const querySnapshot = await getDocs(q);
             
-            // Filtramos por seguridad extra (dueño del dato)
+            // 2. Procesamos y ORDENAMOS aquí en Javascript (es más fácil)
             const data = querySnapshot.docs
                 .map(doc => {
                     const d = doc.data();
@@ -63,20 +62,28 @@ export default function PacienteDetalle() {
                     return {
                         id: doc.id,
                         ...d,
-                        // Formato fecha corto para el gráfico (ej: "17/02")
                         fechaCorta: fechaObj.toLocaleDateString('es-CL', {day:'2-digit', month:'2-digit'}),
                         fechaLarga: fechaObj.toLocaleDateString('es-CL'),
+                        // Aseguramos que sea un objeto Date válido para ordenar después
+                        fechaObj: fechaObj, 
                         pesoNum: Number(d.peso) || 0
                     };
                 })
-                .filter((d: any) => d.creadoPor === email || !d.creadoPor);
+                .filter((d: any) => d.creadoPor === email || !d.creadoPor)
+                // 3. AQUÍ ORDENAMOS: Del más antiguo al más nuevo
+                .sort((a, b) => a.fechaObj.getTime() - b.fechaObj.getTime());
 
             setRegistros(data);
 
-            // Calcular Estadísticas Rápidas
+            // Cálculos
             if (data.length > 0) {
-                const pesoInicio = data[0].pesoNum;
-                const pesoFin = data[data.length - 1].pesoNum;
+                // Buscamos el primer registro con peso válido
+                const primerRegistro = data.find(d => d.pesoNum > 0) || data[0];
+                const ultimoRegistro = data[data.length - 1];
+
+                const pesoInicio = primerRegistro.pesoNum;
+                const pesoFin = ultimoRegistro.pesoNum;
+                
                 setStats({
                     inicio: pesoInicio,
                     actual: pesoFin,
