@@ -2,15 +2,14 @@
 import Link from "next/link";
 import { FileText } from "lucide-react";
 import { useState, useEffect } from "react";
-// --- NUEVO: Importamos herramientas de Firebase ---
+// --- Importamos herramientas de Firebase ---
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
-// --- NUEVO: Herramientas para el bloqueo de sesión ---
+// --- Herramientas para base de datos ---
 import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "firebase/firestore";
 import { Eye, EyeOff, Lock, User, LogOut } from "lucide-react";
 
-// --- NUEVO: Configuración de Firebase ---
-// --- CONFIGURACIÓN REAL DE TU PROYECTO (Copiada de tu foto) ---
+// --- Configuración de Firebase ---
 const firebaseConfig = {
     apiKey: "AIzaSyCjeI7Om5Qqlxcga-O0k_jaqCL8cHbCaNk",
     authDomain: "nutriapp-94e6b.firebaseapp.com",
@@ -18,14 +17,12 @@ const firebaseConfig = {
     storageBucket: "nutriapp-94e6b.firebasestorage.app",
     messagingSenderId: "403128573577",
     appId: "1:403128573577:web:6548324a8c7e93db193058"
-  };
+};
 
 // Iniciamos la conexión
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-// (Aquí abajo sigue tu código normal: const MACROS_PORCION...)
 
 // --- 1. DATA CIENTÍFICA ---
 const MACROS_PORCION = {
@@ -179,29 +176,29 @@ function Input({ label, ...props }: any) { return <div className="flex flex-col 
 function Select({ label, children, ...props }: any) { return <div className="flex flex-col gap-1 w-full"><label className="text-slate-500 font-bold text-[10px] uppercase tracking-wide">{label}</label><select className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-600 bg-white" {...props}>{children}</select></div>; }
 
 export default function Home() {
-    // --- NUEVO: Estado de Sesión ---
-  const [user, setUser] = useState<any>(null); // Guarda al usuario conectado
-  const [loading, setLoading] = useState(true); // Para mostrar "Cargando..."
+  // --- Estado de Sesión ---
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorLogin, setErrorLogin] = useState("");
   const [verClave, setVerClave] = useState(false);
 
-// --- MONITOR DE SESIÓN ÚNICA (Solo deja 1 abierto) ---
-useEffect(() => {
+  // --- MONITOR DE SESIÓN ÚNICA ---
+  useEffect(() => {
     let unsubscribeSnapshot: any = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        // 1. Creamos un código único para esta pestaña actual
+        // 1. Creamos un código único para esta pestaña
         const sessionID = Math.random().toString(36).substring(7);
         localStorage.setItem("session_token", sessionID);
 
-        // 2. Anotamos en Google: "Felipe está usando el token X"
+        // 2. Anotamos sesión activa
         const userRef = doc(db, "active_sessions", currentUser.uid);
         await setDoc(userRef, { lastSession: sessionID, email: currentUser.email }, { merge: true });
 
-        // 3. Miramos el libro de visitas: si el token cambia, ¡fuera!
+        // 3. Monitor de seguridad
         unsubscribeSnapshot = onSnapshot(userRef, (doc) => {
           if (doc.exists()) {
             const data = doc.data();
@@ -227,9 +224,8 @@ useEffect(() => {
       if (unsubscribeSnapshot) unsubscribeSnapshot();
     };
   }, []);
-  // --- PEGAR ESTO EN app/page.tsx (Línea aprox 230) ---
-  
-  // Este efecto "escucha" si vienes del historial con datos
+
+  // --- NUEVO: RECEPTOR DE DATOS DEL HISTORIAL ---
   useEffect(() => {
     const pautaGuardada = localStorage.getItem("pauta_editar");
     
@@ -237,7 +233,7 @@ useEffect(() => {
       try {
         const data = JSON.parse(pautaGuardada);
         
-        // 1. Rellenamos el formulario (Nombre, Peso, etc.)
+        // 1. Rellenamos el formulario
         setDatos({
             nombre: data.paciente || "",
             peso: data.peso || "",
@@ -250,16 +246,18 @@ useEffect(() => {
             restriccion: data.restriccion || "Ninguna"
         });
 
-        // 2. Rellenamos los alimentos (¡Lo más importante!)
+        // 2. Rellenamos los alimentos
         if (data.alimentos) {
             setGrid(data.alimentos);
         }
+
+        // 3. Rellenamos observaciones si existen
+        if (data.observaciones) {
+            setObservaciones(data.observaciones);
+        }
         
-        // 3. Borramos el "encargo" para que no se cargue de nuevo por error
+        // 4. Limpiamos la memoria
         localStorage.removeItem("pauta_editar");
-        
-        // 4. Aviso visual
-        // alert("✅ Datos cargados: " + data.paciente); // (Opcional, si te molesta bórralo)
         
       } catch (e) {
         console.error("Error al cargar pauta", e);
@@ -267,7 +265,7 @@ useEffect(() => {
     }
   }, []);
 
-  // --- NUEVO: Función para iniciar sesión ---
+  // --- Función para iniciar sesión ---
   const handleLogin = async (e: any) => {
     e.preventDefault();
     setErrorLogin("");
@@ -279,11 +277,12 @@ useEffect(() => {
     }
   };
 
-  // --- NUEVO: Función para salir ---
+  // --- Función para salir ---
   const handleLogout = async () => {
     await signOut(auth);
-  }; // Esta es la única llave que debe cerrar el logout
+  };
 
+  // --- FUNCIÓN GUARDAR PLAN (CORREGIDA) ---
   const guardarPlan = async () => {
     if (!datos.nombre || datos.nombre.trim() === "") {
       return alert("⚠️ Por favor, ingresa el nombre del paciente antes de guardar.");
@@ -295,7 +294,7 @@ useEffect(() => {
 
       await setDoc(pautaRef, {
         paciente: datos.nombre,
-        // --- PEGAR ESTO AQUÍ ---
+        // --- CAMPOS COMPLETOS PARA EL HISTORIAL ---
         peso: datos.peso,
         altura: datos.altura,
         edad: datos.edad,
@@ -304,7 +303,7 @@ useEffect(() => {
         objetivo: datos.objetivo,
         estrategia: datos.estrategia,
         restriccion: datos.restriccion,
-        // -----------------------
+        // ----------------------------------------
         profesional: nutriNombre,
         fecha: new Date().toISOString(),
         caloriasMeta: metaCal,
@@ -318,7 +317,8 @@ useEffect(() => {
       console.error("Error al guardar:", error);
       alert("❌ Error al guardar en la base de datos.");
     }
-  }; // Esta cierra el guardarPlan
+  };
+
   const [datos, setDatos] = useState({ 
     nombre: "", peso: "", altura: "", edad: "", genero: "masculino", 
     actividad: "sedentario", objetivo: "bajar", estrategia: "equilibrada",
@@ -950,12 +950,12 @@ ${firma}`;
   };
   
   const diagVisual = getDiagnosticoTiempoReal();
-// --- NUEVO: Si está cargando, muestra espera ---
+
+  // --- Si está cargando, muestra espera ---
   if (loading) return <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400">Cargando seguridad...</div>;
 
-  // --- NUEVO: Si NO hay usuario, muestra pantalla de Login ---
- // --- Si NO hay usuario, muestra Login (VERSIÓN ALTO CONTRASTE) ---
- if (!user) {
+  // --- Si NO hay usuario, muestra Login ---
+  if (!user) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
         <div className="bg-white max-w-sm w-full rounded-2xl shadow-xl overflow-hidden border border-slate-200">
@@ -1017,48 +1017,7 @@ ${firma}`;
       </div>
     );
   }
-  // --- NUEVO: Si está cargando, muestra espera ---
-  if (loading) return <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400">Cargando seguridad...</div>;
 
-  // --- NUEVO: Si NO hay usuario, muestra pantalla de Login ---
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white max-w-sm w-full rounded-2xl shadow-xl overflow-hidden">
-          <div className="bg-blue-600 p-8 text-center">
-            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-              <Lock className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-white mb-1">NutriPlanner</h1>
-            <p className="text-blue-100 text-xs">Acceso Restringido</p>
-          </div>
-          
-          <form onSubmit={handleLogin} className="p-8 space-y-5">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Correo</label>
-              <div className="relative">
-                <User className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none focus:border-blue-500" placeholder="usuario@ejemplo.com" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contraseña</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                <input type={verClave ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full pl-9 pr-10 py-2 border rounded-lg text-sm outline-none focus:border-blue-500" placeholder="••••••••" />
-                <button type="button" onClick={() => setVerClave(!verClave)} className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
-                  {verClave ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-            {errorLogin && <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg font-bold flex gap-2"><span>⚠️</span> {errorLogin}</div>}
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg transition-all">Ingresar</button>
-          </form>
-          <div className="bg-slate-50 p-3 text-center text-[10px] text-slate-400">Protegido por Google Firebase</div>
-        </div>
-      </div>
-    );
-  }  
   return (
     <main className="min-h-screen bg-slate-100 py-8 px-4 font-sans text-slate-800 flex justify-center">
       <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -1195,13 +1154,14 @@ ${firma}`;
                             <button onClick={imprimirProfesional} className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-bold shadow transition flex items-center justify-center gap-2 text-xs">
                                 <span>🖨️</span> Imprimir / PDF
                             </button>
-                        {/* PEGALO AQUÍ (Ahora línea 1118) */}
-                        <button 
-                            onClick={guardarPlan}
-                            className="w-full mt-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg font-bold flex items-center justify-center gap-2 shadow-sm transition-all"
-                        >
-                            <span>💾</span> Guardar en Sistema
-                        </button>
+                            
+                            {/* BOTÓN GUARDAR CORREGIDO */}
+                            <button 
+                                onClick={guardarPlan}
+                                className="w-full mt-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg font-bold flex items-center justify-center gap-2 shadow-sm transition-all"
+                            >
+                                <span>💾</span> Guardar en Sistema
+                            </button>
                         </div>
                     </div>
                     
