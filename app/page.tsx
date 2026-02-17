@@ -184,145 +184,7 @@ export default function Home() {
   const [errorLogin, setErrorLogin] = useState("");
   const [verClave, setVerClave] = useState(false);
 
-  // --- MONITOR DE SESIÓN ÚNICA ---
-  useEffect(() => {
-    let unsubscribeSnapshot: any = null;
-
-    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        // 1. Creamos un código único para esta pestaña
-        const sessionID = Math.random().toString(36).substring(7);
-        localStorage.setItem("session_token", sessionID);
-
-        // 2. Anotamos sesión activa
-        const userRef = doc(db, "active_sessions", currentUser.uid);
-        await setDoc(userRef, { lastSession: sessionID, email: currentUser.email }, { merge: true });
-
-        // 3. Monitor de seguridad
-        unsubscribeSnapshot = onSnapshot(userRef, (doc) => {
-          if (doc.exists()) {
-            const data = doc.data();
-            const localToken = localStorage.getItem("session_token");
-            
-            if (data.lastSession !== localToken) {
-              alert("⚠️ SESIÓN CERRADA: Se ha iniciado sesión en otro dispositivo.");
-              handleLogout();
-            }
-          }
-        });
-
-        setUser(currentUser);
-      } else {
-        setUser(null);
-        if (unsubscribeSnapshot) unsubscribeSnapshot();
-      }
-      setLoading(false);
-    });
-
-    return () => {
-      unsubscribeAuth();
-      if (unsubscribeSnapshot) unsubscribeSnapshot();
-    };
-  }, []);
-
-// --- NUEVO: RECEPTOR DE DATOS DEL HISTORIAL (ACTUALIZADO CON ANTROPOMETRÍA) ---
-useEffect(() => {
-  const pautaGuardada = localStorage.getItem("pauta_editar");
-  
-  if (pautaGuardada) {
-    try {
-      const data = JSON.parse(pautaGuardada);
-      
-      // 1. Rellenamos datos básicos
-      setDatos({
-          nombre: data.paciente || "",
-          peso: data.peso || "",
-          altura: data.altura || "",
-          edad: data.edad || "",
-          genero: data.genero || "Femenino",
-          actividad: data.actividad || "Sedentario",
-          objetivo: data.objetivo || "Déficit (Pérdida de Grasa)",
-          estrategia: data.estrategia || "Equilibrada (Minsal)",
-          restriccion: data.restriccion || "Ninguna"
-      });
-
-      // 2. Rellenamos alimentos
-      if (data.alimentos) setGrid(data.alimentos);
-
-      // 3. Rellenamos observaciones
-      if (data.observaciones) setObservaciones(data.observaciones);
-      
-      // 4. NUEVO: Rellenamos Antropometría y desplegamos el menú
-      if (data.antropometria) {
-          setAntropometria({
-              ...data.antropometria,
-              mostrar: true // ¡Truco UX! Si tiene datos, abrimos la cajita solos
-          });
-      }
-      
-      // 5. Limpiamos la memoria
-      localStorage.removeItem("pauta_editar");
-      
-    } catch (e) {
-      console.error("Error al cargar pauta", e);
-    }
-  }
-}, []);
-
-  // --- Función para iniciar sesión ---
-  const handleLogin = async (e: any) => {
-    e.preventDefault();
-    setErrorLogin("");
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
-      if (error.code === 'auth/invalid-credential') setErrorLogin("🚫 Correo o clave incorrectos");
-      else setErrorLogin("❌ Error de conexión.");
-    }
-  };
-
-  // --- Función para salir ---
-  const handleLogout = async () => {
-    await signOut(auth);
-  };
-
-  // --- FUNCIÓN GUARDAR PLAN (CORREGIDA) ---
-  const guardarPlan = async () => {
-    if (!datos.nombre || datos.nombre.trim() === "") {
-      return alert("⚠️ Por favor, ingresa el nombre del paciente antes de guardar.");
-    }
-
-    try {
-      const pautaID = `${datos.nombre.replace(/\s+/g, '_')}-${Date.now()}`;
-      const pautaRef = doc(db, "pautas", pautaID);
-
-      await setDoc(pautaRef, {
-        paciente: datos.nombre,
-        // --- CAMPOS COMPLETOS PARA EL HISTORIAL ---
-        peso: datos.peso,
-        altura: datos.altura,
-        edad: datos.edad,
-        genero: datos.genero,
-        actividad: datos.actividad,
-        objetivo: datos.objetivo,
-        estrategia: datos.estrategia,
-        restriccion: datos.restriccion,
-        // ----------------------------------------
-        profesional: nutriNombre,
-        fecha: new Date().toISOString(),
-        caloriasMeta: metaCal,
-        macros: totales,
-        alimentos: grid,
-        observaciones: observaciones
-      });
-
-      alert("✅ ¡Plan de " + datos.nombre + " guardado con éxito!");
-    } catch (error) {
-      console.error("Error al guardar:", error);
-      alert("❌ Error al guardar en la base de datos.");
-    }
-  };
-
+  // --- Estados de la App ---
   const [datos, setDatos] = useState({ 
     nombre: "", peso: "", altura: "", edad: "", genero: "masculino", 
     actividad: "sedentario", objetivo: "bajar", estrategia: "equilibrada",
@@ -378,6 +240,138 @@ useEffect(() => {
   const [diagnostico, setDiagnostico] = useState({ imc: 0, estado: "", color: "" });
   const [mensajeAlerta, setMensajeAlerta] = useState("");
 
+  // --- MONITOR DE SESIÓN ÚNICA ---
+  useEffect(() => {
+    let unsubscribeSnapshot: any = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        const sessionID = Math.random().toString(36).substring(7);
+        localStorage.setItem("session_token", sessionID);
+
+        const userRef = doc(db, "active_sessions", currentUser.uid);
+        await setDoc(userRef, { lastSession: sessionID, email: currentUser.email }, { merge: true });
+
+        unsubscribeSnapshot = onSnapshot(userRef, (doc) => {
+          if (doc.exists()) {
+            const data = doc.data();
+            const localToken = localStorage.getItem("session_token");
+            
+            if (data.lastSession !== localToken) {
+              alert("⚠️ SESIÓN CERRADA: Se ha iniciado sesión en otro dispositivo.");
+              handleLogout();
+            }
+          }
+        });
+
+        setUser(currentUser);
+      } else {
+        setUser(null);
+        if (unsubscribeSnapshot) unsubscribeSnapshot();
+      }
+      setLoading(false);
+    });
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+    };
+  }, []);
+
+  // --- CARGAR DATOS DESDE EL HISTORIAL ---
+  useEffect(() => {
+    const pautaGuardada = localStorage.getItem("pauta_editar");
+    
+    if (pautaGuardada) {
+      try {
+        const data = JSON.parse(pautaGuardada);
+        
+        // 1. Rellenamos el formulario
+        setDatos({
+            nombre: data.paciente || "",
+            peso: data.peso || "",
+            altura: data.altura || "",
+            edad: data.edad || "",
+            genero: data.genero || "Femenino",
+            actividad: data.actividad || "Sedentario",
+            objetivo: data.objetivo || "Déficit (Pérdida de Grasa)",
+            estrategia: data.estrategia || "Equilibrada (Minsal)",
+            restriccion: data.restriccion || "Ninguna"
+        });
+
+        // 2. Rellenamos los alimentos
+        if (data.alimentos) setGrid(data.alimentos);
+
+        // 3. Rellenamos observaciones
+        if (data.observaciones) setObservaciones(data.observaciones);
+
+        // 4. NUEVO: Rellenamos Antropometría
+        if (data.antropometria) {
+            setAntropometria({ ...data.antropometria, mostrar: true });
+        }
+        
+        localStorage.removeItem("pauta_editar");
+        
+      } catch (e) {
+        console.error("Error al cargar pauta", e);
+      }
+    }
+  }, []);
+
+  // --- FUNCIONES DE AUTENTICACIÓN ---
+  const handleLogin = async (e: any) => {
+    e.preventDefault();
+    setErrorLogin("");
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (error: any) {
+      if (error.code === 'auth/invalid-credential') setErrorLogin("🚫 Correo o clave incorrectos");
+      else setErrorLogin("❌ Error de conexión.");
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+  };
+
+  // --- FUNCIÓN GUARDAR PLAN (COMPLETA CON ANTROPO) ---
+  const guardarPlan = async () => {
+    if (!datos.nombre || datos.nombre.trim() === "") {
+      return alert("⚠️ Por favor, ingresa el nombre del paciente antes de guardar.");
+    }
+
+    try {
+      const pautaID = `${datos.nombre.replace(/\s+/g, '_')}-${Date.now()}`;
+      const pautaRef = doc(db, "pautas", pautaID);
+
+      await setDoc(pautaRef, {
+        paciente: datos.nombre,
+        peso: datos.peso,
+        altura: datos.altura,
+        edad: datos.edad,
+        genero: datos.genero,
+        actividad: datos.actividad,
+        objetivo: datos.objetivo,
+        estrategia: datos.estrategia,
+        restriccion: datos.restriccion,
+        profesional: nutriNombre,
+        fecha: new Date().toISOString(),
+        caloriasMeta: metaCal,
+        macros: totales,
+        alimentos: grid,
+        observaciones: observaciones,
+        antropometria: antropometria, // Guardamos la antropometría
+        creadoPor: user?.email
+      });
+
+      alert("✅ ¡Plan de " + datos.nombre + " guardado con éxito!");
+    } catch (error) {
+      console.error("Error al guardar:", error);
+      alert("❌ Error al guardar en la base de datos.");
+    }
+  };
+
+  // --- HANDLERS ---
   const handleChange = (e: any) => setDatos({ ...datos, [e.target.name]: e.target.value });
   const handleAntro = (e: any) => setAntropometria({...antropometria, [e.target.name]: e.target.value});
 
