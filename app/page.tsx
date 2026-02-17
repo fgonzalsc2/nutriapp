@@ -225,45 +225,49 @@ export default function Home() {
     };
   }, []);
 
-  // --- NUEVO: RECEPTOR DE DATOS DEL HISTORIAL ---
-  useEffect(() => {
-    const pautaGuardada = localStorage.getItem("pauta_editar");
-    
-    if (pautaGuardada) {
-      try {
-        const data = JSON.parse(pautaGuardada);
-        
-        // 1. Rellenamos el formulario
-        setDatos({
-            nombre: data.paciente || "",
-            peso: data.peso || "",
-            altura: data.altura || "",
-            edad: data.edad || "",
-            genero: data.genero || "Femenino",
-            actividad: data.actividad || "Sedentario",
-            objetivo: data.objetivo || "Déficit (Pérdida de Grasa)",
-            estrategia: data.estrategia || "Equilibrada (Minsal)",
-            restriccion: data.restriccion || "Ninguna"
-        });
+// --- NUEVO: RECEPTOR DE DATOS DEL HISTORIAL (ACTUALIZADO CON ANTROPOMETRÍA) ---
+useEffect(() => {
+  const pautaGuardada = localStorage.getItem("pauta_editar");
+  
+  if (pautaGuardada) {
+    try {
+      const data = JSON.parse(pautaGuardada);
+      
+      // 1. Rellenamos datos básicos
+      setDatos({
+          nombre: data.paciente || "",
+          peso: data.peso || "",
+          altura: data.altura || "",
+          edad: data.edad || "",
+          genero: data.genero || "Femenino",
+          actividad: data.actividad || "Sedentario",
+          objetivo: data.objetivo || "Déficit (Pérdida de Grasa)",
+          estrategia: data.estrategia || "Equilibrada (Minsal)",
+          restriccion: data.restriccion || "Ninguna"
+      });
 
-        // 2. Rellenamos los alimentos
-        if (data.alimentos) {
-            setGrid(data.alimentos);
-        }
+      // 2. Rellenamos alimentos
+      if (data.alimentos) setGrid(data.alimentos);
 
-        // 3. Rellenamos observaciones si existen
-        if (data.observaciones) {
-            setObservaciones(data.observaciones);
-        }
-        
-        // 4. Limpiamos la memoria
-        localStorage.removeItem("pauta_editar");
-        
-      } catch (e) {
-        console.error("Error al cargar pauta", e);
+      // 3. Rellenamos observaciones
+      if (data.observaciones) setObservaciones(data.observaciones);
+      
+      // 4. NUEVO: Rellenamos Antropometría y desplegamos el menú
+      if (data.antropometria) {
+          setAntropometria({
+              ...data.antropometria,
+              mostrar: true // ¡Truco UX! Si tiene datos, abrimos la cajita solos
+          });
       }
+      
+      // 5. Limpiamos la memoria
+      localStorage.removeItem("pauta_editar");
+      
+    } catch (e) {
+      console.error("Error al cargar pauta", e);
     }
-  }, []);
+  }
+}, []);
 
   // --- Función para iniciar sesión ---
   const handleLogin = async (e: any) => {
