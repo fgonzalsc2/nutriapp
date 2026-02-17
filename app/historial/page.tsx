@@ -5,7 +5,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, collection, getDocs, query, orderBy, doc, deleteDoc } from "firebase/firestore";
 import Link from "next/link";
-// --- AGREGADO: LineChart en los imports ---
+// --- IMPORTANTE: Agregamos LineChart a los íconos ---
 import { Trash2, Search, ArrowLeft, FileText, Loader2, Calendar, User, Download, LineChart } from "lucide-react";
 
 // --- CONFIGURACIÓN FIREBASE ---
@@ -70,7 +70,7 @@ export default function HistorialPage() {
         setCargando(false);
     };
 
-    // 2. EXPORTAR A EXCEL (ARREGLADO: HORA 24H Y SIN EMOJIS)
+    // 2. EXPORTAR A EXCEL (Versión corregida ; y tildes)
     const exportarExcel = () => {
         if (pautas.length === 0) return alert("No hay datos para exportar.");
 
@@ -153,6 +153,7 @@ export default function HistorialPage() {
                     </div>
 
                     <div className="flex gap-2">
+                        {/* BOTÓN EXCEL */}
                         <button 
                             onClick={exportarExcel}
                             className="bg-white hover:bg-slate-50 text-slate-700 px-4 py-3 rounded-xl shadow-sm border border-slate-200 font-bold text-xs flex items-center gap-2 transition-all active:scale-95"
@@ -193,78 +194,72 @@ export default function HistorialPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {pautasFiltradas.length > 0 ? (
-                                pautasFiltradas.map((p) => {
-                                    const f = new Date(p.fecha);
-                                    return (
-                                    <tr key={p.id} className="hover:bg-blue-50/30 transition-colors group">
-                                        <td className="p-5">
-                                            <div className="flex items-center gap-2 text-slate-700 font-bold text-sm">
-                                                <Calendar className="w-3.5 h-3.5 text-blue-500" />
-                                                {f.toLocaleDateString('es-CL')}
-                                            </div>
-                                            <div className="text-[10px] text-slate-400 font-medium ml-5">
-                                                {f.toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'})} hrs
-                                            </div>
-                                        </td>
-                                        
-                                        <td className="p-5">
-                                            <div className="font-extrabold text-slate-800 text-base uppercase tracking-tight">{p.paciente}</div>
-                                            <div className="text-[11px] text-slate-500 font-semibold italic">
-                                                {ESTRATEGIAS_LABELS[p.estrategia] || "Personalizada"}
-                                            </div>
-                                        </td>
-                                        
-                                        <td className="p-5 text-center">
-                                            <span className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-black border border-slate-200">
-                                                {Math.round(p.caloriasMeta || 0)} <span className="text-[9px] opacity-60">KCAL</span>
-                                            </span>
-                                        </td>
-                                        
-                                        <td className="p-5 text-center">
-                                            {getObjetivoBadge(p.objetivo)}
-                                        </td>
-                                        
-                                        {/* COLUMNA ACCIONES */}
-                                        <td className="p-5 text-right">
-                                            <div className="flex justify-end gap-1">
-                                                {/* BOTÓN NUEVO: VER GRÁFICO */}
-                                                <Link 
-                                                    href={`/paciente/${p.paciente}`}
-                                                    className="p-2.5 text-purple-600 hover:bg-purple-100 rounded-xl transition-all"
-                                                    title="Ver Evolución y Gráficos"
-                                                >
-                                                    <LineChart className="w-5 h-5" />
-                                                </Link>
+                            {pautasFiltradas.map((p) => {
+                                const f = new Date(p.fecha);
+                                return (
+                                <tr key={p.id} className="hover:bg-blue-50/30 transition-colors group">
+                                    {/* FECHA */}
+                                    <td className="p-5">
+                                        <div className="flex items-center gap-2 text-slate-700 font-bold text-sm">
+                                            <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                                            {f.toLocaleDateString('es-CL')}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400 font-medium ml-5">
+                                            {f.toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'})} hrs
+                                        </div>
+                                    </td>
+                                    
+                                    {/* PACIENTE */}
+                                    <td className="p-5">
+                                        <div className="font-extrabold text-slate-800 text-base uppercase tracking-tight">{p.paciente}</div>
+                                        <div className="text-[11px] text-slate-500 font-semibold italic">
+                                            {ESTRATEGIAS_LABELS[p.estrategia] || "Personalizada"}
+                                        </div>
+                                    </td>
+                                    
+                                    {/* CALORÍAS */}
+                                    <td className="p-5 text-center">
+                                        <span className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-black border border-slate-200">
+                                            {Math.round(p.caloriasMeta || 0)} <span className="text-[9px] opacity-60">KCAL</span>
+                                        </span>
+                                    </td>
+                                    
+                                    {/* OBJETIVO */}
+                                    <td className="p-5 text-center">
+                                        {getObjetivoBadge(p.objetivo)}
+                                    </td>
+                                    
+                                    {/* ACCIONES (AQUÍ ESTÁ EL BOTÓN NUEVO) */}
+                                    <td className="p-5 text-right">
+                                        <div className="flex justify-end gap-1">
+                                            
+                                            {/* --- BOTÓN GRÁFICO (NUEVO) --- */}
+                                            <Link 
+                                                href={`/paciente/${p.paciente}`}
+                                                className="p-2.5 text-purple-600 hover:bg-purple-100 rounded-xl transition-all"
+                                                title="Ver Evolución y Gráficos"
+                                            >
+                                                <LineChart className="w-5 h-5" />
+                                            </Link>
 
-                                                <button 
-                                                    onClick={() => cargarEnCalculadora(p)}
-                                                    className="p-2.5 text-blue-600 hover:bg-blue-100 rounded-xl transition-all"
-                                                    title="Ver Detalle / Editar"
-                                                >
-                                                    <FileText className="w-5 h-5" />
-                                                </button>
-                                                <button 
-                                                    onClick={() => borrarPauta(p.id)}
-                                                    className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                                    title="Eliminar"
-                                                >
-                                                    <Trash2 className="w-5 h-5" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )})
-                            ) : (
-                                <tr>
-                                    <td colSpan={5} className="p-12 text-center text-slate-400">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <User className="w-10 h-10 opacity-20" />
-                                            <p>No tienes pacientes registrados con este usuario.</p>
+                                            <button 
+                                                onClick={() => cargarEnCalculadora(p)}
+                                                className="p-2.5 text-blue-600 hover:bg-blue-100 rounded-xl transition-all"
+                                                title="Ver Detalle / Editar"
+                                            >
+                                                <FileText className="w-5 h-5" />
+                                            </button>
+                                            <button 
+                                                onClick={() => borrarPauta(p.id)}
+                                                className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                                title="Eliminar"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
-                            )}
+                            )})}
                         </tbody>
                     </table>
                 </div>
