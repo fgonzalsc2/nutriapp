@@ -1014,15 +1014,17 @@ ${firma}`;
     <main className="min-h-screen bg-slate-100 py-8 px-4 font-sans text-slate-800 flex justify-center">
       <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8">
         <section className="lg:col-span-3 bg-white p-6 rounded-2xl shadow-lg border border-slate-200 h-fit sticky top-4">
-        <div className="flex justify-between items-start">
-                    <h1 className="font-bold text-2xl text-blue-700 mb-2">NutriPlanner Clínico</h1>
-                    <Link href="/historial" className="p-2 mr-2 text-slate-400 hover:text-blue-600 transition-colors rounded-full hover:bg-blue-50" title="Ver Historial">
-                    <FileText className="w-5 h-5" />
-                    </Link>
-                    <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors" title="Cerrar Sesión">
-                        <LogOut className="w-5 h-5" />
-                    </button>
-                  </div>
+        <div className="flex justify-between items-start mb-2">
+  <h1 className="font-bold text-2xl text-blue-700">NutriPlanner Clínico</h1>
+  <div className="flex gap-2">
+    <Link href="/historial" className="p-2 text-slate-400 hover:text-blue-600 transition-colors" title="Ver Historial">
+      <FileText className="w-5 h-5" />
+    </Link>
+    <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors" title="Cerrar Sesión">
+      <LogOut className="w-5 h-5" />
+    </button>
+  </div>
+</div>
           <p className="text-xs text-slate-400 mb-6">Herramienta profesional de cálculo</p>
           
           <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
