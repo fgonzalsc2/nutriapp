@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { FileText } from "lucide-react";
 "use client";
 import { useState, useEffect } from "react";
 // --- NUEVO: Importamos herramientas de Firebase ---
@@ -1014,6 +1016,9 @@ ${firma}`;
         <section className="lg:col-span-3 bg-white p-6 rounded-2xl shadow-lg border border-slate-200 h-fit sticky top-4">
         <div className="flex justify-between items-start">
                     <h1 className="font-bold text-2xl text-blue-700 mb-2">NutriPlanner Clínico</h1>
+                    <Link href="/historial" className="p-2 mr-2 text-slate-400 hover:text-blue-600 transition-colors rounded-full hover:bg-blue-50" title="Ver Historial">
+                    <FileText className="w-5 h-5" />
+                    </Link>
                     <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors" title="Cerrar Sesión">
                         <LogOut className="w-5 h-5" />
                     </button>
