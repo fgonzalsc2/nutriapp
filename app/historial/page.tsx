@@ -21,7 +21,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- DICCIONARIO DE ESTRATEGIAS ---
+// --- DICCIONARIO DE ESTRATEGIAS (Para visualización en pantalla) ---
 const ESTRATEGIAS_LABELS: Record<string, string> = {
     equilibrada: "⚖️ Equilibrada",
     mediterranea: "🍅 Mediterránea",
@@ -60,7 +60,6 @@ export default function HistorialPage() {
             
             const datos = querySnapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() }))
-                // FILTRO DE SEGURIDAD: Solo mis pacientes + antiguos sin dueño
                 .filter((doc: any) => doc.creadoPor === email || !doc.creadoPor); 
 
             setPautas(datos);
@@ -70,31 +69,33 @@ export default function HistorialPage() {
         setCargando(false);
     };
 
-    // 2. EXPORTAR A EXCEL (MEJORADO PARA LATINOAMÉRICA - PUNTO Y COMA)
+    // 2. EXPORTAR A EXCEL (ARREGLADO: HORA 24H Y SIN EMOJIS)
     const exportarExcel = () => {
         if (pautas.length === 0) return alert("No hay datos para exportar.");
 
-        // TRUCO: "sep=;" le dice a Excel que use punto y coma como separador
-        // \uFEFF es el BOM para que reconozca tildes y ñ
-        let csvContent = "\uFEFFsep=;\n"; 
+        // Usamos solo BOM (\uFEFF) y punto y coma (;). 
+        // Esto fuerza a Excel en español a abrirlo correctamente sin comandos extraños.
+        let csvContent = "\uFEFF"; 
         csvContent += "Fecha;Hora;Paciente;Estrategia;Peso (kg);Objetivo;Calorias Meta\n";
 
         pautas.forEach(p => {
             const f = new Date(p.fecha);
             const fecha = f.toLocaleDateString('es-CL');
-            const hora = f.toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit'});
             
-            // Limpiamos punto y coma del nombre para evitar errores
+            // SOLUCIÓN HORA: Usamos 'hour12: false' para formato 14:30 (Sin p.m. ni caracteres raros)
+            const hora = f.toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit', hour12: false});
+            
             const nombre = p.paciente ? p.paciente.replace(/;/g, "") : "Sin nombre"; 
-            const est = ESTRATEGIAS_LABELS[p.estrategia] || p.estrategia || "Personalizada";
             
-            // Manejamos valores vacíos con un guion "-"
+            // SOLUCIÓN TEXTO: Usamos el nombre limpio (Capitalizado) en vez del emoji para que el Excel sea formal
+            let estTexto = p.estrategia || "Personalizada";
+            estTexto = estTexto.charAt(0).toUpperCase() + estTexto.slice(1); // ej: "equilibrada" -> "Equilibrada"
+
             const peso = p.peso || "-";
             const objetivo = p.objetivo || "-";
             const calorias = p.caloriasMeta ? Math.round(p.caloriasMeta) : "0";
 
-            // Usamos ; como separador
-            const row = `${fecha};${hora};${nombre};${est};${peso};${objetivo};${calorias}`;
+            const row = `${fecha};${hora};${nombre};${estTexto};${peso};${objetivo};${calorias}`;
             csvContent += row + "\n";
         });
 
@@ -102,7 +103,6 @@ export default function HistorialPage() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        // Nombre del archivo con fecha
         const fechaArchivo = new Date().toISOString().split('T')[0];
         link.setAttribute("download", `Pacientes_NutriApp_${fechaArchivo}.csv`);
         document.body.appendChild(link);
