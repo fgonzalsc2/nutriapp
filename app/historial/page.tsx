@@ -5,7 +5,8 @@ import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, collection, getDocs, query, orderBy, doc, deleteDoc } from "firebase/firestore";
 import Link from "next/link";
-import { Trash2, Search, ArrowLeft, FileText, Loader2, Calendar, User, Download } from "lucide-react";
+// --- AGREGADO: LineChart en los imports ---
+import { Trash2, Search, ArrowLeft, FileText, Loader2, Calendar, User, Download, LineChart } from "lucide-react";
 
 // --- CONFIGURACIÓN FIREBASE ---
 const firebaseConfig = {
@@ -21,7 +22,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- DICCIONARIO DE ESTRATEGIAS (Para visualización en pantalla) ---
+// --- DICCIONARIO DE ESTRATEGIAS ---
 const ESTRATEGIAS_LABELS: Record<string, string> = {
     equilibrada: "⚖️ Equilibrada",
     mediterranea: "🍅 Mediterránea",
@@ -73,23 +74,18 @@ export default function HistorialPage() {
     const exportarExcel = () => {
         if (pautas.length === 0) return alert("No hay datos para exportar.");
 
-        // Usamos solo BOM (\uFEFF) y punto y coma (;). 
-        // Esto fuerza a Excel en español a abrirlo correctamente sin comandos extraños.
-        let csvContent = "\uFEFF"; 
+        let csvContent = "\uFEFFsep=;\n"; 
         csvContent += "Fecha;Hora;Paciente;Estrategia;Peso (kg);Objetivo;Calorias Meta\n";
 
         pautas.forEach(p => {
             const f = new Date(p.fecha);
             const fecha = f.toLocaleDateString('es-CL');
-            
-            // SOLUCIÓN HORA: Usamos 'hour12: false' para formato 14:30 (Sin p.m. ni caracteres raros)
             const hora = f.toLocaleTimeString('es-CL', {hour: '2-digit', minute:'2-digit', hour12: false});
             
             const nombre = p.paciente ? p.paciente.replace(/;/g, "") : "Sin nombre"; 
             
-            // SOLUCIÓN TEXTO: Usamos el nombre limpio (Capitalizado) en vez del emoji para que el Excel sea formal
             let estTexto = p.estrategia || "Personalizada";
-            estTexto = estTexto.charAt(0).toUpperCase() + estTexto.slice(1); // ej: "equilibrada" -> "Equilibrada"
+            estTexto = estTexto.charAt(0).toUpperCase() + estTexto.slice(1);
 
             const peso = p.peso || "-";
             const objetivo = p.objetivo || "-";
@@ -157,7 +153,6 @@ export default function HistorialPage() {
                     </div>
 
                     <div className="flex gap-2">
-                        {/* BOTÓN EXCEL */}
                         <button 
                             onClick={exportarExcel}
                             className="bg-white hover:bg-slate-50 text-slate-700 px-4 py-3 rounded-xl shadow-sm border border-slate-200 font-bold text-xs flex items-center gap-2 transition-all active:scale-95"
@@ -203,7 +198,6 @@ export default function HistorialPage() {
                                     const f = new Date(p.fecha);
                                     return (
                                     <tr key={p.id} className="hover:bg-blue-50/30 transition-colors group">
-                                        {/* COLUMNA FECHA */}
                                         <td className="p-5">
                                             <div className="flex items-center gap-2 text-slate-700 font-bold text-sm">
                                                 <Calendar className="w-3.5 h-3.5 text-blue-500" />
@@ -214,7 +208,6 @@ export default function HistorialPage() {
                                             </div>
                                         </td>
                                         
-                                        {/* COLUMNA PACIENTE */}
                                         <td className="p-5">
                                             <div className="font-extrabold text-slate-800 text-base uppercase tracking-tight">{p.paciente}</div>
                                             <div className="text-[11px] text-slate-500 font-semibold italic">
@@ -222,14 +215,12 @@ export default function HistorialPage() {
                                             </div>
                                         </td>
                                         
-                                        {/* COLUMNA CALORÍAS */}
                                         <td className="p-5 text-center">
                                             <span className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-black border border-slate-200">
                                                 {Math.round(p.caloriasMeta || 0)} <span className="text-[9px] opacity-60">KCAL</span>
                                             </span>
                                         </td>
                                         
-                                        {/* COLUMNA OBJETIVO */}
                                         <td className="p-5 text-center">
                                             {getObjetivoBadge(p.objetivo)}
                                         </td>
@@ -237,6 +228,15 @@ export default function HistorialPage() {
                                         {/* COLUMNA ACCIONES */}
                                         <td className="p-5 text-right">
                                             <div className="flex justify-end gap-1">
+                                                {/* BOTÓN NUEVO: VER GRÁFICO */}
+                                                <Link 
+                                                    href={`/paciente/${p.paciente}`}
+                                                    className="p-2.5 text-purple-600 hover:bg-purple-100 rounded-xl transition-all"
+                                                    title="Ver Evolución y Gráficos"
+                                                >
+                                                    <LineChart className="w-5 h-5" />
+                                                </Link>
+
                                                 <button 
                                                     onClick={() => cargarEnCalculadora(p)}
                                                     className="p-2.5 text-blue-600 hover:bg-blue-100 rounded-xl transition-all"
