@@ -7,8 +7,9 @@ import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 // --- Herramientas para base de datos ---
 import { getFirestore, doc, setDoc, onSnapshot } from "firebase/firestore";
-import { Eye, EyeOff, Lock, User, LogOut, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Lock, User, LogOut } from "lucide-react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Sparkles } from "lucide-react";
 
 // --- Configuración de Firebase ---
 const firebaseConfig = {
@@ -173,9 +174,8 @@ const OBJETIVOS_LABELS: any = {
 };
 
 // --- UI COMPONENTS ---
-// --- UI COMPONENTS (VERSIÓN COMPACTA) ---
-function Input({ label, ...props }: any) { return <div className="flex flex-col gap-0.5 w-full"><label className="text-slate-500 font-bold text-[9px] uppercase tracking-wide">{label}</label><input className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-blue-600 bg-white h-8" {...props} /></div>; }
-function Select({ label, children, ...props }: any) { return <div className="flex flex-col gap-0.5 w-full"><label className="text-slate-500 font-bold text-[9px] uppercase tracking-wide">{label}</label><select className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-blue-600 bg-white h-8" {...props}>{children}</select></div>; }
+function Input({ label, ...props }: any) { return <div className="flex flex-col gap-1 w-full"><label className="text-slate-500 font-bold text-[10px] uppercase tracking-wide">{label}</label><input className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-600 bg-white" {...props} /></div>; }
+function Select({ label, children, ...props }: any) { return <div className="flex flex-col gap-1 w-full"><label className="text-slate-500 font-bold text-[10px] uppercase tracking-wide">{label}</label><select className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-600 bg-white" {...props}>{children}</select></div>; }
 
 export default function Home() {
   // --- Estado de Sesión ---
@@ -216,19 +216,6 @@ export default function Home() {
   const [nutriNombre, setNutriNombre] = useState("");
   const [observaciones, setObservaciones] = useState("");
 
-  // --- 1. LÓGICA DE NOTAS RÁPIDAS ---
-  const RECOMENDACIONES_RAPIDAS = {
-    "Resistencia Insulina": "• Orden de comida: 1° Fibra (Ensalada) -> 2° Proteína -> 3° Carbohidratos.",
-    "Ansiedad PM": "• Si tienes hambre extra: Gelatina light, caldo de huesos o bastones de apio a libre demanda.",
-    "Reflujo": "• Evitar: Café, menta, tomate y picantes. Última comida 3 horas antes de dormir.",
-    "Constipación": "• Meta: 2.5L de agua al día + 1 cda de linaza/chia remojada en ayunas.",
-    "Deportista": "• Pre-Entreno: Fruta o carbohidrato simple 45 min antes. Post-Entreno: Proteína inmediata."
-  };
-
-  const agregarNota = (texto: string) => {
-    setObservaciones(prev => prev ? `${prev}\n\n${texto}` : texto);
-  };
-
   const [grid, setGrid] = useState({
     desayuno: { cereales: 0, proteina: 0, lacteos: 0, frutas: 0, grasas: 0, verduras: 0 },
     colacion: { cereales: 0, proteina: 0, lacteos: 0, frutas: 0, grasas: 0, verduras: 0 },
@@ -254,70 +241,72 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState(false);
   const [diagnostico, setDiagnostico] = useState({ imc: 0, estado: "", color: "" });
   const [mensajeAlerta, setMensajeAlerta] = useState("");
-  
-  // Estado para la Lista de Compras
-  const [listaCompras, setListaCompras] = useState("");
-  const [cargandoLista, setCargandoLista] = useState(false);
-  const [tabIA, setTabIA] = useState<'menu' | 'lista'>('menu'); 
-  
-  // --- LÓGICA DEL CHEF IA ---
-  const [menuIA, setMenuIA] = useState("");
-  const [cargandoIA, setCargandoIA] = useState(false);
-  const [mostrarChef, setMostrarChef] = useState(false); // NUEVO: Estado para plegar
+
+    // --- LÓGICA DEL CHEF IA ---
+    const [menuIA, setMenuIA] = useState("");
+    const [cargandoIA, setCargandoIA] = useState(false);
 
     const generarMenuIA = async () => {
+      // 1. Validación básica
       if (!totales.cho || !totales.prot) {
         return alert("Primero calcula las porciones (botón verde).");
       }
-   
+  
       setCargandoIA(true);
-   
+  
+      // 2. CONSTRUCCIÓN INTELIGENTE DEL PROMPT (Aquí está la magia)
       let detallesComidas = "";
       const ordenComidas = ['desayuno', 'colacion', 'almuerzo', 'colacion_tarde', 'once', 'cena', 'recena'];
-   
+  
       ordenComidas.forEach((tiempo) => {
+          // Solo incluimos la comida si el checkbox está marcado (visible[tiempo] es true)
           if (visible[tiempo]) { 
               const porciones = (grid as any)[tiempo];
               let detallePorciones = "";
-   
+  
+              // Recorremos los ingredientes de esa comida (cereales, proteinas, etc.)
               Object.keys(porciones).forEach((alimento) => {
                   const cantidad = porciones[alimento];
                   if (cantidad > 0) {
+                      // Convertimos "cereales" a "Cereales y Pan" para que el Chef entienda mejor
                       const nombreAlimento = DISPLAY_LABELS[alimento] || alimento;
                       detallePorciones += `- ${cantidad} porción(es) de ${nombreAlimento}\n`;
                   }
               });
-   
+  
+              // Si la comida tiene ingredientes asignados, la agregamos a la lista
               if (detallePorciones) {
                   const nombreComida = MEAL_NAMES[tiempo] || tiempo.toUpperCase();
                   detallesComidas += `\n📌 ${nombreComida}:\n${detallePorciones}`;
               }
           }
       });
-   
+  
+      // Agregamos las notas del cuadro de texto si existen
       let notasExtra = observaciones ? `\n⚠️ NOTAS IMPORTANTES DE LA NUTRICIONISTA: "${observaciones}"` : "";
-   
+  
       const prompt = `Actúa como un Chef Nutricionista Experto en cocina chilena.
       Crea un MENÚ DE UN DÍA detallado, realista y apetitoso para un paciente con objetivo: ${datos.objetivo}.
-   
+  
       DATOS GLOBALES:
       - Calorías Totales del día: ${Math.round(totales.cal)} kcal.
       
       INSTRUCCIONES DE ARMADO (Usa ESTRICTAMENTE estos ingredientes por comida):
       ${detallesComidas}
-   
+  
       ${notasExtra}
-   
+  
       REGLAS:
       1. Solo genera las comidas listadas arriba. Si falta la Cena en la lista, NO la inventes.
       2. Usa ingredientes chilenos comunes y preparaciones típicas cuando sea posible.
       3. Si hay "0 porciones" de algo en una comida, no lo incluyas.
       4. Formato de respuesta: Nombre del plato atractivo + Breve descripción de cómo usar los ingredientes asignados.`;
-   
+  
+      // 3. TU LLAVE Y CONFIGURACIÓN (Mantenemos lo que ya funcionaba)
       const API_KEY = "AIzaSyCgsceTHpNoBE9lBijN_luk0ZpBE7FT9R8";
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
-   
+  
       try {
         const respuesta = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${API_KEY}`,
@@ -334,17 +323,17 @@ export default function Home() {
             }),
           }
         );
-   
+  
         clearTimeout(timeoutId);
-   
+  
         if (!respuesta.ok) throw new Error(`Error de Google: ${respuesta.status}`);
-   
+  
         const data = await respuesta.json();
         const textoMenu = data.candidates[0].content.parts[0].text;
-   
+  
         setMenuIA(textoMenu);
         setCargandoIA(false);
-   
+  
       } catch (error: any) {
         if (error.name === 'AbortError') {
           alert("El Chef tardó demasiado. Intenta de nuevo.");
@@ -355,52 +344,6 @@ export default function Home() {
         setCargandoIA(false);
       }
     };
-
-    const generarListaIA = async () => {
-      if (!menuIA) return alert("Primero debes generar un Menú con el Chef (botón morado).");
-      
-      setCargandoLista(true);
-      setTabIA('lista'); 
-   
-      const API_KEY = "AIzaSyCgsceTHpNoBE9lBijN_luk0ZpBE7FT9R8"; 
-      
-      const prompt = `Actúa como un Asistente de Compras experto.
-      Analiza este MENÚ NUTRICIONAL y crea una LISTA DE COMPRAS consolidada:
-      
-      "${menuIA}"
-      
-      INSTRUCCIONES:
-      1. Agrupa por pasillo: 🥬 VERDULERÍA, 🥩 CARNICERÍA, 🥫 DESPENSA/ABARROTES, 🥛 LÁCTEOS Y FRIOS.
-      2. Suma las cantidades (ej: si hay huevo al desayuno y cena, pon "2 Unidades").
-      3. Sé conciso (Solo ingrediente y cantidad estimada).
-      4. Formato: Usa viñetas y emojis.`;
-   
-      try {
-        const respuesta = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { maxOutputTokens: 800 } 
-            }),
-          }
-        );
-   
-        const data = await respuesta.json();
-        const textoLista = data.candidates[0].content.parts[0].text;
-   
-        setListaCompras(textoLista);
-        setCargandoLista(false);
-   
-      } catch (error) {
-        console.error(error);
-        alert("Error creando la lista.");
-        setCargandoLista(false);
-      }
-    };
-
   // --- MONITOR DE SESIÓN ÚNICA ---
   useEffect(() => {
     let unsubscribeSnapshot: any = null;
@@ -1179,311 +1122,259 @@ ${firma}`;
 
   return (
     <main className="min-h-screen bg-slate-100 py-8 px-4 font-sans text-slate-800 flex justify-center">
-      <div className="w-full max-w-[95%] grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* --- COLUMNA 1: DATOS DEL PACIENTE (Compacta) --- */}
-        <section className="lg:col-span-2 bg-white p-4 rounded-2xl shadow-lg border border-slate-200 h-fit sticky top-4 flex flex-col gap-4">
+      <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <section className="lg:col-span-3 bg-white p-6 rounded-2xl shadow-lg border border-slate-200 h-fit sticky top-4">
+        <div className="flex justify-between items-start mb-2">
+  <h1 className="font-bold text-2xl text-blue-700">NutriPlanner Clínico</h1>
+  <div className="flex gap-2">
+    <Link href="/historial" className="p-2 text-slate-400 hover:text-blue-600 transition-colors" title="Ver Historial">
+      <FileText className="w-5 h-5" />
+    </Link>
+    <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors" title="Cerrar Sesión">
+      <LogOut className="w-5 h-5" />
+    </button>
+  </div>
+</div>
+          <p className="text-xs text-slate-400 mb-6">Herramienta profesional de cálculo</p>
+          
+          <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-4">
+            <label className="text-[10px] font-bold text-blue-800 uppercase block mb-1">Nombre del Profesional (Para la firma)</label>
+            <input 
+                className="w-full border border-blue-200 rounded px-2 py-1 text-sm text-blue-900 bg-white placeholder-blue-300" 
+                placeholder="Ej: Nut. María Pérez" 
+                value={nutriNombre} 
+                onChange={(e) => setNutriNombre(e.target.value)} 
+            />
+          </div>
+
+          <form onSubmit={iniciarPlan} className="flex flex-col gap-4">
+            <Input label="Paciente" name="nombre" value={datos.nombre} onChange={handleChange} />
+            <div className="grid grid-cols-2 gap-4"><Input label="Peso (kg)" name="peso" type="number" value={datos.peso} onChange={handleChange} /><Input label="Altura (cm)" name="altura" type="number" value={datos.altura} onChange={handleChange} /></div>
+            <div className="grid grid-cols-2 gap-4"><Input label="Edad" name="edad" type="number" value={datos.edad} onChange={handleChange} /><Select label="Sexo" name="genero" value={datos.genero} onChange={handleChange}><option value="masculino">Masculino</option><option value="femenino">Femenino</option></Select></div>
             
-            {/* ENCABEZADO COMPACTO */}
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                <div>
-                    <h1 className="font-black text-lg text-blue-700 leading-tight">NutriPlanner</h1>
-                    <p className="text-[10px] text-slate-400 font-medium">Panel Clínico Pro</p>
-                </div>
-                <Link href="/historial" className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors" title="Ver Historial">
-                    <FileText className="w-4 h-4" />
-                </Link>
+            <div className="bg-orange-50 p-3 rounded-lg border border-orange-100">
+                <Select label="Restricción / Alergia" name="restriccion" value={datos.restriccion} onChange={handleChange} className="bg-transparent font-bold text-orange-800">
+                    <option value="normal">Ninguna</option>
+                    <option value="celiaco">Celiaco (Sin Gluten)</option>
+                    <option value="lactosa">Intolerante Lactosa</option>
+                    <option value="vegetariano">Vegetariano (Huevo/Lácteo)</option>
+                    <option value="vegano">Vegano (Estricto)</option>
+                    <option value="fodmap">Dieta FODMAP (SIBO/Colon Irritable)</option>
+                    <option value="menopausia">Menopausia / Climaterio</option>
+                    <option value="diabetes">Diabetes / Resistencia Insulina</option>
+                    <option value="hipertension">Hipertensión (HTA)</option>
+                    <option value="embarazo">Embarazo / Lactancia</option>
+                    <option value="colesterol">Colesterol Alto (Dislipidemia)</option>
+                    <option value="reflujo">Reflujo / Gastritis</option>
+                    <option value="gota">Gota / Ácido Úrico Alto</option>
+                </Select>
             </div>
 
-            <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
-                <label className="text-[9px] font-bold text-blue-800 uppercase block mb-1">Tu Nombre (Firma)</label>
-                <input 
-                    className="w-full border border-blue-200 rounded px-2 py-1 text-xs text-blue-900 bg-white placeholder-blue-300 h-7" 
-                    placeholder="Ej: Nut. María Pérez" 
-                    value={nutriNombre} 
-                    onChange={(e) => setNutriNombre(e.target.value)} 
-                />
+            <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100"><Select label="Estrategia" name="estrategia" value={datos.estrategia} onChange={handleChange} className="bg-transparent font-bold text-indigo-800">{Object.entries(ESTRATEGIAS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</Select></div>
+            <div className="grid grid-cols-2 gap-4">
+                <Select label="Actividad" name="actividad" value={datos.actividad} onChange={handleChange}>
+                    <option value="sedentario">Sedentario (Oficina / Sin ejercicio)</option>
+                    <option value="moderado">Moderado (Ejercicio 1-3 veces/sem)</option>
+                    <option value="intenso">Deportista (Ejercicio 4-6 veces/sem)</option>
+                </Select>
+                <Select label="Objetivo" name="objetivo" value={datos.objetivo} onChange={handleChange}>
+                    <option value="bajar">Déficit (Pérdida de Grasa)</option>
+                    <option value="mantener">Normocalórico (Mantención)</option>
+                    <option value="subir">Superávit (Hipertrofia)</option>
+                </Select>
             </div>
 
-            <form onSubmit={iniciarPlan} className="flex flex-col gap-3">
-                <Input label="Nombre Paciente" name="nombre" value={datos.nombre} onChange={handleChange} placeholder="Nombre completo" />
+            {/* SECCIÓN ANTROPOMETRÍA DESPLEGABLE */}
+            <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
+                <button type="button" onClick={() => setAntropometria({...antropometria, mostrar: !antropometria.mostrar})} className="w-full px-4 py-3 flex justify-between items-center text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">
+                    <span>📐 AGREGAR ANTROPOMETRÍA (Opcional)</span>
+                    <span>{antropometria.mostrar ? "▲" : "▼"}</span>
+                </button>
                 
-                <div className="grid grid-cols-2 gap-3">
-                    <Input label="Peso (kg)" name="peso" type="number" value={datos.peso} onChange={handleChange} />
-                    <Input label="Altura (cm)" name="altura" type="number" value={datos.altura} onChange={handleChange} />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3">
-                    <Input label="Edad" name="edad" type="number" value={datos.edad} onChange={handleChange} />
-                    <Select label="Sexo" name="genero" value={datos.genero} onChange={handleChange}>
-                        <option value="masculino">Masculino</option>
-                        <option value="femenino">Femenino</option>
-                    </Select>
-                </div>
-                
-                <div className="bg-orange-50 p-2 rounded-lg border border-orange-100">
-                    <Select label="Restricción / Alergia" name="restriccion" value={datos.restriccion} onChange={handleChange} className="bg-transparent font-bold text-orange-800 text-xs h-7 border-0">
-                        <option value="normal">Ninguna</option>
-                        <option value="celiaco">Celiaco (Sin Gluten)</option>
-                        <option value="lactosa">Intolerante Lactosa</option>
-                        <option value="vegetariano">Vegetariano</option>
-                        <option value="vegano">Vegano</option>
-                        <option value="fodmap">Dieta FODMAP</option>
-                        <option value="menopausia">Menopausia</option>
-                        <option value="diabetes">Diabetes / Resistencia</option>
-                        <option value="hipertension">Hipertensión</option>
-                        <option value="embarazo">Embarazo</option>
-                        <option value="colesterol">Colesterol Alto</option>
-                        <option value="reflujo">Reflujo / Gastritis</option>
-                        <option value="gota">Gota</option>
-                    </Select>
-                </div>
-
-                <div className="bg-indigo-50 p-2 rounded-lg border border-indigo-100">
-                    <Select label="Estrategia Nutricional" name="estrategia" value={datos.estrategia} onChange={handleChange} className="bg-transparent font-bold text-indigo-800 text-xs h-7 border-0">
-                        {Object.entries(ESTRATEGIAS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                    </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                    <Select label="Actividad Física" name="actividad" value={datos.actividad} onChange={handleChange}>
-                        <option value="sedentario">Sedentario</option>
-                        <option value="moderado">Moderado</option>
-                        <option value="intenso">Deportista</option>
-                    </Select>
-                    <Select label="Objetivo" name="objetivo" value={datos.objetivo} onChange={handleChange}>
-                        <option value="bajar">Déficit</option>
-                        <option value="mantener">Mantención</option>
-                        <option value="subir">Superávit</option>
-                    </Select>
-                </div>
-
-                {/* SECCIÓN ANTROPOMETRÍA (Colapsada por defecto) */}
-                <div className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50">
-                    <button type="button" onClick={() => setAntropometria({...antropometria, mostrar: !antropometria.mostrar})} className="w-full px-3 py-2 flex justify-between items-center text-[10px] font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 transition uppercase tracking-wide">
-                        <span>📐 Antropometría (Opcional)</span>
-                        <span>{antropometria.mostrar ? "▲" : "▼"}</span>
-                    </button>
-                    
-                    {antropometria.mostrar && (
-                        <div className="p-3 space-y-2 bg-white animate-in slide-in-from-top-1">
-                            {/* Fila 1: Perímetros */}
-                            <div className="grid grid-cols-2 gap-2">
-                                <Input label="Cintura (cm)" name="cintura" type="number" value={antropometria.cintura} onChange={handleAntro} />
-                                <Input label="Brazo (cm)" name="brazo" type="number" value={antropometria.brazo} onChange={handleAntro} />
-                            </div>
-                            
-                            {/* Fila 2: Pliegues Brazo */}
-                            <div className="grid grid-cols-2 gap-2">
-                                <Input label="Tricipital (mm)" name="tricipital" type="number" value={antropometria.tricipital} onChange={handleAntro} />
-                                <Input label="Bicipital (mm)" name="bicipital" type="number" value={antropometria.bicipital} onChange={handleAntro} />
-                            </div>
-
-                            {/* Fila 3: Pliegues Tronco */}
-                            <div className="grid grid-cols-2 gap-2">
-                                <Input label="Subescapular (mm)" name="subescapular" type="number" value={antropometria.subescapular} onChange={handleAntro} />
-                                <Input label="Suprailiaco (mm)" name="suprailiaco" type="number" value={antropometria.suprailiaco} onChange={handleAntro} />
-                            </div>
-
-                            {resAntro.grasa > 0 && (
-                                <div className="text-[10px] bg-blue-50 p-1.5 rounded text-blue-800 border border-blue-100 text-center mt-1">
-                                    <b>{resAntro.grasa}% Grasa</b> | {resAntro.amb} cm² Músculo
-                                </div>
-                            )}
+                {antropometria.mostrar && (
+                    <div className="p-4 space-y-3 bg-white">
+                        <Input label="Circunferencia Cintura (cm)" name="cintura" type="number" placeholder="Ej: 85" value={antropometria.cintura} onChange={handleAntro} />
+                        <Input label="Circunferencia Brazo (cm)" name="brazo" type="number" placeholder="Ej: 30" value={antropometria.brazo} onChange={handleAntro} />
+                        <div className="grid grid-cols-2 gap-3">
+                            <Input label="Pliegue Tricipital (mm)" name="tricipital" type="number" placeholder="Ej: 15" value={antropometria.tricipital} onChange={handleAntro} />
+                            <Input label="Pliegue Bicipital (mm)" name="bicipital" type="number" placeholder="Ej: 8" value={antropometria.bicipital} onChange={handleAntro} />
+                            <Input label="Pl. Subescapular (mm)" name="subescapular" type="number" placeholder="Ej: 12" value={antropometria.subescapular} onChange={handleAntro} />
+                            <Input label="Pl. Suprailiaco (mm)" name="suprailiaco" type="number" placeholder="Ej: 20" value={antropometria.suprailiaco} onChange={handleAntro} />
                         </div>
-                    )}
-                </div>
-
-                <button className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl shadow-md mt-1 transition active:scale-95 text-xs uppercase tracking-widest border-b-4 border-slate-950 active:border-b-0 active:translate-y-1">
-                    ⚡ CALCULAR AHORA
-                </button>
-            </form>
-
-            {/* BOTÓN CERRAR SESIÓN (Zona Segura al final) */}
-            <div className="mt-2 border-t border-slate-100 pt-3 flex justify-center">
-                <button 
-                    onClick={handleLogout} 
-                    className="flex items-center gap-2 text-[10px] font-bold text-slate-300 hover:text-red-500 transition-colors px-3 py-1 rounded hover:bg-red-50"
-                >
-                    <LogOut className="w-3 h-3" />
-                    Cerrar Sesión
-                </button>
+                        {resAntro.grasa > 0 && (
+                            <div className="text-xs bg-blue-50 p-2 rounded text-blue-800 border border-blue-100">
+                                <b>Est.:</b> {resAntro.grasa}% Grasa | {resAntro.amb} cm² Músculo
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
+
+            <button className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-4 rounded-xl shadow-md mt-2 transition active:scale-95">CALCULAR AUTOMÁTICO</button>
+          </form>
         </section>
         
-        {/* --- COLUMNA 2: PANEL CENTRAL (6 cols) --- */}
-        <section className="lg:col-span-6 flex flex-col gap-6">
+        <section className="lg:col-span-9 flex flex-col gap-6">
           {!activeTab ? (
              <div className="h-full bg-white rounded-2xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 p-10"><h3 className="font-bold text-lg">Listo para calcular</h3></div>
           ) : (
             <>
-{/* ENCABEZADO DE DASHBOARD (Corregido: Incluye Guía) */}
-<div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 sticky top-4 z-20">
-                 
-                 {/* FILA 1: Título y Datos */}
-                 <div className="flex justify-between items-start mb-2">
-                    <div>
-                        <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resumen Nutricional</h2>
-                        <div className="flex items-baseline gap-2 mt-1">
-                            <span className={`text-3xl font-black tracking-tight ${getCalColor()}`}>
-                                {Math.round(totales.cal)}
-                            </span>
-                            <div className="flex flex-col leading-none">
-                                <span className="text-[10px] text-slate-400 font-bold uppercase">Kcal Actuales</span>
-                                <span className="text-xs font-bold text-slate-500">
-                                    Meta: {metaCal} <span className="text-slate-300">|</span> Dif: {Math.round(totales.cal - metaCal) > 0 ? "+" : ""}{Math.round(totales.cal - metaCal)}
-                                </span>
-                            </div>
+              <div className="bg-white p-5 rounded-2xl shadow-md border border-slate-200 sticky top-4 z-20">
+                 <div className="flex flex-col md:flex-row justify-between items-center mb-4 border-b border-slate-100 pb-4 gap-4">
+                    <div className="flex-1">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Plan Actual vs Meta</div>
+                        <div className="flex items-baseline gap-2">
+                            <span className={`text-3xl font-black ${getCalColor()}`}>{totales.cal}</span>
+                            <span className="text-sm font-bold text-slate-400">/ {metaCal} kcal (Meta)</span>
+                        </div>
+                        <div className={`mt-2 px-3 py-1.5 rounded-lg text-xs font-bold text-center w-full ${diagVisual.color}`}>
+                            {diagVisual.msg}
                         </div>
                     </div>
-
-                    <div className="flex flex-col items-end gap-1">
-                        <div className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-wide border ${diagnostico.color}`}>
-                            IMC: {diagnostico.estado}
-                        </div>
-                        {mensajeAlerta && (
-                            <div className="text-[9px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded border border-red-100 max-w-[150px] text-right truncate">
-                                {mensajeAlerta}
-                            </div>
-                        )}
+                    <div className="flex flex-col gap-2 min-w-[140px]">
+                        <div className={`px-3 py-1 rounded-lg border text-xs font-bold flex items-center ${diagnostico.color}`}>IMC: {diagnostico.estado}</div>
+                        {mensajeAlerta && ( <div className={`px-3 py-1 rounded-lg border text-[10px] font-bold max-w-xs ${mensajeAlerta.includes("ALERTA") ? "bg-red-50 border-red-200 text-red-700" : "bg-blue-50 border-blue-200 text-blue-700"}`}>{mensajeAlerta}</div>)}
                     </div>
-                 </div>
-
-                 {/* FILA 2: BARRA DE ACCIONES (Aquí volvió la Guía) */}
-                 <div className={`mb-4 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-between border ${diagVisual.color}`}>
-                    <span className="truncate mr-2">{diagVisual.msg}</span>
                     
-                    <div className="flex items-center gap-3 shrink-0">
-                        {/* Grupo WhatsApp */}
-                        <div className="flex items-center gap-2">
-                            <button onClick={copiarPauta} className="hover:underline opacity-80 hover:opacity-100 transition flex items-center gap-1" title="Copiar Plan Diario">
-                                📲 Pauta
-                            </button>
-                            <span className="opacity-20">/</span>
-                            <button onClick={copiarGuia} className="hover:underline opacity-80 hover:opacity-100 transition flex items-center gap-1" title="Copiar Guía de Porciones">
-                                📚 Guía
-                            </button>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+                        {/* GRUPO WHATSAPP */}
+                        <div className="md:col-span-7 flex flex-col gap-1">
+                            <span className="text-[10px] font-bold text-green-600 uppercase tracking-wide">COPIAR PARA WHATSAPP 👇</span>
+                            <div className="flex gap-2">
+                                <button onClick={copiarPauta} className="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg font-bold shadow transition flex items-center justify-center gap-2 text-xs">
+                                    <span>📲</span> Pauta WhatsApp
+                                </button>
+                                <button onClick={copiarGuia} className="flex-1 bg-teal-600 hover:bg-teal-700 text-white px-3 py-2 rounded-lg font-bold shadow transition flex items-center justify-center gap-2 text-xs">
+                                    <span>📚</span> Guía WhatsApp
+                                </button>
+                            </div>
                         </div>
 
-                        <span className="opacity-20 text-slate-400">|</span>
-                        
-                        <button onClick={imprimirProfesional} className="hover:underline opacity-80 hover:opacity-100 transition flex items-center gap-1">
-                            🖨️ PDF
-                        </button>
-                        
-                        <span className="opacity-20 text-slate-400">|</span>
-                        
-                        <button onClick={guardarPlan} className="hover:underline opacity-80 hover:opacity-100 transition flex items-center gap-1 text-indigo-700">
-                            💾 Guardar
-                        </button>
+                        {/* GRUPO DOCUMENTO */}
+                        <div className="md:col-span-5 flex flex-col gap-1">
+                            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wide">GENERAR DOCUMENTO 👇</span>
+                            <button onClick={imprimirProfesional} className="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-bold shadow transition flex items-center justify-center gap-2 text-xs">
+                                <span>🖨️</span> Imprimir / PDF
+                            </button>
+                            
+                            {/* BOTÓN GUARDAR CORREGIDO */}
+                            <button 
+                                onClick={guardarPlan}
+                                className="w-full mt-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg font-bold flex items-center justify-center gap-2 shadow-sm transition-all"
+                            >
+                                <span>💾</span> Guardar en Sistema
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div className="mt-4">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Notas del Especialista (Opcional)</label>
+                        <textarea 
+                            value={observaciones} 
+                            onChange={(e) => setObservaciones(e.target.value)} 
+                            placeholder="Escribe aquí indicaciones extra (Ej: Tomar 2 litros de agua, evitar café de noche...)"
+                            className="w-full border border-slate-200 rounded-lg p-3 text-sm h-20 outline-none focus:border-blue-400 resize-none bg-slate-50"
+                        />
                     </div>
                  </div>
 
-                 {/* FILA 3: MACROS */}
-                 <div className="grid grid-cols-3 gap-4 border-t border-slate-100 pt-3">
-                    {/* Proteína */}
+                 {/* BLOQUE DE MACROS CON CALORÍAS Y G/KG */}
+                 <div className="grid grid-cols-3 gap-6 text-center">
+                    
+                    {/* COLUMNA PROTEÍNA (Azul) */}
                     <div>
-                        <div className="flex justify-between items-end mb-1">
-                            <span className="text-[10px] font-bold text-blue-600 uppercase">Proteína</span>
-                            <span className="text-[9px] font-bold text-slate-400">{totales.pP}% / {ESTRATEGIAS[datos.estrategia].p}%</span>
+                        <div className="flex justify-between text-xs font-bold text-blue-700 mb-1">
+                            <span>Prot: {totales.pP}%</span>
+                            <span className="text-slate-400 font-normal">Meta: {ESTRATEGIAS[datos.estrategia].p}%</span>
                         </div>
-                        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden mb-1">
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                             <div className={`h-full ${getBarColor(totales.pP, ESTRATEGIAS[datos.estrategia].p, "bg-blue-500")}`} style={{width: `${Math.min(totales.pP, 100)}%`}}></div>
                         </div>
-                        <div className="flex justify-between text-[10px]">
-                            <span className="font-bold text-slate-700">{totales.prot}g</span>
-                            <span className="text-slate-400">{(totales.prot/(Number(datos.peso) || 1)).toFixed(1)} g/kg</span>
+                        <div className="text-xs text-slate-500 mt-1 flex flex-col items-center">
+                            <span className="font-bold text-slate-700 text-sm">{totales.prot}g</span>
+                            <span className="text-[10px] text-slate-400">({Math.round(totales.prot * 4)} kcal)</span>
+                            <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 mt-0.5 font-bold">
+                                {(totales.prot/(Number(datos.peso) || 1)).toFixed(1)} g/kg
+                            </span>
                         </div>
                     </div>
-                    {/* Carbos */}
+
+                    {/* COLUMNA CARBOHIDRATOS (Naranjo) */}
                     <div>
-                        <div className="flex justify-between items-end mb-1">
-                            <span className="text-[10px] font-bold text-orange-600 uppercase">Carbos</span>
-                            <span className="text-[9px] font-bold text-slate-400">{totales.pC}% / {ESTRATEGIAS[datos.estrategia].c}%</span>
+                        <div className="flex justify-between text-xs font-bold text-orange-700 mb-1">
+                            <span>Carb: {totales.pC}%</span>
+                            <span className="text-slate-400 font-normal">Meta: {ESTRATEGIAS[datos.estrategia].c}%</span>
                         </div>
-                        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden mb-1">
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                              <div className={`h-full ${getBarColor(totales.pC, ESTRATEGIAS[datos.estrategia].c, "bg-orange-500")}`} style={{width: `${Math.min(totales.pC, 100)}%`}}></div>
                         </div>
-                        <div className="flex justify-between text-[10px]">
-                             <span className="font-bold text-slate-700">{totales.cho}g</span>
-                             <span className="text-slate-400">{(totales.cho/(Number(datos.peso) || 1)).toFixed(1)} g/kg</span>
+                        <div className="text-xs text-slate-500 mt-1 flex flex-col items-center">
+                             <span className="font-bold text-slate-700 text-sm">{totales.cho}g</span>
+                             <span className="text-[10px] text-slate-400">({Math.round(totales.cho * 4)} kcal)</span>
+                             <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100 mt-0.5 font-bold">
+                                {(totales.cho/(Number(datos.peso) || 1)).toFixed(1)} g/kg
+                            </span>
                         </div>
                     </div>
-                    {/* Grasas */}
+
+                    {/* COLUMNA GRASAS (Amarillo) */}
                     <div>
-                        <div className="flex justify-between items-end mb-1">
-                            <span className="text-[10px] font-bold text-yellow-600 uppercase">Grasas</span>
-                            <span className="text-[9px] font-bold text-slate-400">{totales.pF}% / {ESTRATEGIAS[datos.estrategia].f}%</span>
+                        <div className="flex justify-between text-xs font-bold text-yellow-700 mb-1">
+                            <span>Gras: {totales.pF}%</span>
+                            <span className="text-slate-400 font-normal">Meta: {ESTRATEGIAS[datos.estrategia].f}%</span>
                         </div>
-                        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden mb-1">
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                             <div className={`h-full ${getBarColor(totales.pF, ESTRATEGIAS[datos.estrategia].f, "bg-yellow-500")}`} style={{width: `${Math.min(totales.pF, 100)}%`}}></div>
                         </div>
-                        <div className="flex justify-between text-[10px]">
-                             <span className="font-bold text-slate-700">{totales.gras}g</span>
-                             <span className="text-slate-400">{(totales.gras/(Number(datos.peso) || 1)).toFixed(1)} g/kg</span>
+                        <div className="text-xs text-slate-500 mt-1 flex flex-col items-center">
+                             <span className="font-bold text-slate-700 text-sm">{totales.gras}g</span>
+                             <span className="text-[10px] text-slate-400">({Math.round(totales.gras * 9)} kcal)</span>
+                             <span className="text-[10px] bg-yellow-50 text-yellow-600 px-1.5 py-0.5 rounded border border-yellow-100 mt-0.5 font-bold">
+                                {(totales.gras/(Number(datos.peso) || 1)).toFixed(1)} g/kg
+                            </span>
                         </div>
                     </div>
                  </div>
               </div>
-              {/* GRILLA DE COMIDAS (TEXTO VISIBLE + BOTONES MINI) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
                 {['desayuno', 'colacion', 'almuerzo', 'colacion_tarde', 'once', 'cena', 'recena'].map((t) => {
                   return (
-                  <div key={t} className={`p-2 rounded-xl border transition ${visible[t] ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-50 border-slate-100'}`}>
-                    
-                    {/* TÍTULO DE LA COMIDA */}
-                    <div className="flex justify-between items-center mb-1 pb-1 border-b border-slate-100">
+                  <div key={t} className={`p-3 rounded-xl border transition ${visible[t] ? 'bg-white border-slate-100 shadow-sm hover:border-blue-100' : 'bg-slate-50 border-slate-100'}`}>
+                    <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-100">
                         <div className="flex items-center gap-2">
-                            <input type="checkbox" checked={visible[t]} onChange={() => toggleMeal(t)} className="w-3 h-3 cursor-pointer accent-blue-600" />
-                            <h3 className={`font-black uppercase text-[10px] tracking-wide ${visible[t] ? 'text-slate-700' : 'text-slate-400'}`}>{MEAL_NAMES[t] || t}</h3>
+                            <input type="checkbox" checked={visible[t]} onChange={() => toggleMeal(t)} className="w-3 h-3 cursor-pointer" />
+                            <h3 className={`font-bold uppercase text-xs ${visible[t] ? 'text-slate-700' : 'text-slate-400'}`}>{MEAL_NAMES[t] || t}</h3>
                         </div>
                     </div>
-
-                    {/* LISTA DE ALIMENTOS */}
                     {visible[t] ? (
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                         {['verduras', 'cereales', 'proteina', 'lacteos', 'frutas', 'grasas'].map((g) => {
                             let subLabel = FOOD_DB_DISPLAY[g];
                             if (g === 'verduras') {
                                 const cantidad = (grid as any)[t][g];
-                                if (cantidad === 0) subLabel = "Libres (A gusto)";
-                                else subLabel = "Taza (+ Libres)";
+                                if (cantidad === 0) subLabel = "🥗 Base: Solo Libres (A gusto)";
+                                else subLabel = "Taza General (+ Libres a gusto)";
                             }
 
                             return (
-                            <div key={g} className="flex justify-between items-center py-1 group hover:bg-slate-50 rounded px-1 -mx-1 transition">
-                                {/* LADO IZQUIERDO: TEXTO COMPLETO (Se ajusta, no se corta) */}
-                                <div className="flex-1 pr-1 flex flex-col justify-center">
-                                    <span className="text-[9px] font-bold text-slate-700 uppercase leading-none">
-                                        {DISPLAY_LABELS[g]}
-                                    </span>
-                                    <span className={`text-[8px] font-medium leading-tight mt-0.5 ${g==='verduras' ? 'text-green-600' : 'text-slate-400'}`}>
-                                        {subLabel}
-                                    </span>
-                                </div>
-
-                                {/* LADO DERECHO: CONTROLES MINI (w-4 y h-5 para ahorrar espacio) */}
-                                <div className="flex items-center bg-white border border-slate-200 rounded shrink-0 shadow-sm h-5">
-                                    <button 
-                                        onClick={()=>ajustar(t, g, -0.5)} 
-                                        className="w-4 h-full flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 font-bold transition text-[10px] rounded-l border-r border-slate-100"
-                                    >-</button>
-                                    
-                                    <span className="text-[9px] font-black w-5 text-center text-slate-800 select-none bg-slate-50 h-full flex items-center justify-center">
-                                        {(grid as any)[t][g]}
-                                    </span>
-                                    
-                                    <button 
-                                        onClick={()=>ajustar(t, g, 0.5)} 
-                                        className="w-4 h-full flex items-center justify-center text-slate-400 hover:text-blue-500 hover:bg-blue-50 font-bold transition text-[10px] rounded-r border-l border-slate-100"
-                                    >+</button>
-                                </div>
+                            <div key={g} className="flex justify-between items-center group">
+                            <div className="w-20">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase">{DISPLAY_LABELS[g]}</span>
+                                <span className={`block text-[8px] font-normal leading-tight ${g==='verduras' ? 'text-green-600 font-bold' : 'text-slate-400'}`}>
+                                    {subLabel}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-1 bg-slate-50 rounded-lg p-0.5 border border-slate-100 group-hover:border-blue-200"><button onClick={()=>ajustar(t, g, -0.5)} className="w-5 h-5 flex items-center justify-center bg-white rounded shadow-sm text-slate-400 hover:text-red-500 font-bold transition">-</button><span className="text-xs font-bold w-4 text-center text-slate-700">{(grid as any)[t][g]}</span><button onClick={()=>ajustar(t, g, 0.5)} className="w-5 h-5 flex items-center justify-center bg-white rounded shadow-sm text-slate-400 hover:text-green-500 font-bold transition">+</button></div>
                             </div>
                         )})}
                         </div>
                     ) : (
-                        <div className="h-24 flex flex-col items-center justify-center text-slate-300 gap-1">
-                            <span className="text-[9px] font-bold uppercase">Omitido</span>
+                        <div className="h-24 flex flex-col items-center justify-center text-slate-400 gap-1 opacity-50">
+                            <span className="text-xs font-bold">Tiempo Omitido</span>
+                            <span className="text-[9px] text-center leading-tight">
+                                Activa la casilla ↑ <br/> para habilitar
+                            </span>
                         </div>
                     )}
                   </div>
@@ -1492,144 +1383,37 @@ ${firma}`;
             </>
           )}
         </section>
+      </div>
 
-        {/* --- COLUMNA 3: PANEL DERECHO (4 cols) --- */}
-        <section className="lg:col-span-4 flex flex-col gap-6">
-          
-          {/* 1. NOTAS DEL ESPECIALISTA (Siempre visibles) */}
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 sticky top-4 z-10">
-              <div className="flex justify-between items-center mb-3">
-                <label className="text-xs font-black text-slate-700 uppercase flex items-center gap-2">
-                    📝 Notas Clínicas
-                </label>
-                <button 
-                    onClick={() => setObservaciones("")}
-                    className="text-[10px] text-red-400 hover:text-red-600 font-bold hover:underline"
-                >
-                    Limpiar
-                </button>
+      {/* --- ZONA CHEF IA --- */}
+      <div className="mt-8 mx-auto max-w-4xl bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-2xl border border-purple-100 shadow-sm mb-10">
+          <div className="flex justify-between items-center mb-4">
+              <div>
+                  <h3 className="text-purple-900 font-bold flex items-center gap-2 text-lg">
+                      <Sparkles className="w-5 h-5 text-purple-600" /> 
+                      Chef Inteligente
+                  </h3>
+                  <p className="text-xs text-purple-600">Genera ideas de recetas basadas en tus porciones</p>
               </div>
-
-              {/* Botones Rápidos */}
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                  {Object.entries(RECOMENDACIONES_RAPIDAS).map(([titulo, texto]) => (
-                      <button
-                          key={titulo}
-                          onClick={() => agregarNota(texto)}
-                          className="text-[9px] font-bold px-2 py-1 rounded-md bg-slate-50 border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-all"
-                      >
-                          + {titulo}
-                      </button>
-                  ))}
-              </div>
-
-              <textarea 
-                  value={observaciones} 
-                  onChange={(e) => setObservaciones(e.target.value)} 
-                  placeholder="Escribe indicaciones o selecciona arriba..."
-                  className="w-full border border-slate-200 rounded-lg p-3 text-xs h-40 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none bg-slate-50"
-              />
-          </div>
-
-          {/* 2. CHEF INTELIGENTE (Plegable) */}
-          <div className={`bg-white rounded-2xl border transition-all duration-300 overflow-hidden ${mostrarChef ? 'shadow-xl border-purple-200 ring-1 ring-purple-100' : 'shadow-sm border-slate-200'}`}>
-              
-              {/* ENCABEZADO (Botón) */}
               <button 
-                  onClick={() => setMostrarChef(!mostrarChef)}
-                  className={`w-full p-4 flex justify-between items-center transition-colors ${mostrarChef ? 'bg-purple-50' : 'bg-white hover:bg-slate-50'}`}
+                  onClick={generarMenuIA}
+                  disabled={cargandoIA}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition flex items-center gap-2 shadow-lg shadow-purple-200 active:scale-95"
               >
-                  <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${mostrarChef ? 'bg-white text-purple-600 shadow-sm' : 'bg-slate-100 text-slate-400'}`}>
-                          <Sparkles className="w-5 h-5" />
-                      </div>
-                      <div className="text-left">
-                          <h3 className={`font-bold text-sm ${mostrarChef ? 'text-purple-900' : 'text-slate-600'}`}>
-                              Chef Inteligente IA
-                          </h3>
-                          <p className="text-[10px] text-slate-400">
-                              {mostrarChef ? "Asistente activo" : "Click para desplegar"}
-                          </p>
-                      </div>
-                  </div>
-                  <div className={`transform transition-transform duration-300 text-slate-400 ${mostrarChef ? 'rotate-180 text-purple-500' : ''}`}>
-                      ▼
-                  </div>
+                  {cargandoIA ? (
+                      <>⏳ Cocinando...</>
+                  ) : (
+                      <>✨ Crear Menú Ejemplo</>
+                  )}
               </button>
-
-              {/* CUERPO DEL CHEF */}
-              {mostrarChef && (
-                  <div className="p-4 border-t border-purple-100 bg-white animate-in slide-in-from-top-2 fade-in duration-200">
-                      
-                      {/* Pestañas Menú / Lista */}
-                      <div className="flex bg-slate-100 p-1 rounded-lg mb-4">
-                          <button 
-                            onClick={() => setTabIA('menu')}
-                            className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition ${tabIA==='menu' ? 'bg-white text-purple-700 shadow-sm' : 'text-slate-400 hover:text-purple-500'}`}
-                          >
-                            🍽️ MENÚ
-                          </button>
-                          <button 
-                            onClick={() => setTabIA('lista')}
-                            className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition ${tabIA==='lista' ? 'bg-white text-pink-700 shadow-sm' : 'text-slate-400 hover:text-pink-500'}`}
-                          >
-                            🛒 COMPRAS
-                          </button>
-                      </div>
-
-                      {/* Contenido Menú */}
-                      {tabIA === 'menu' && (
-                        <>
-                            <button 
-                                onClick={generarMenuIA} 
-                                disabled={cargandoIA}
-                                className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-bold text-xs transition shadow-lg shadow-purple-200 active:scale-95 flex justify-center items-center gap-2 mb-4"
-                            >
-                                {cargandoIA ? "🔥 Cocinando..." : "✨ Generar Menú"}
-                            </button>
-                            
-                            {menuIA && (
-                                <div className="bg-purple-50 p-3 rounded-xl border border-purple-100 text-xs text-slate-700 whitespace-pre-line leading-relaxed relative max-h-96 overflow-y-auto custom-scrollbar">
-                                    <button 
-                                        onClick={() => {navigator.clipboard.writeText(menuIA); alert("Copiado!");}}
-                                        className="sticky top-0 float-right ml-2 mb-2 text-[9px] bg-white border border-purple-200 text-purple-600 px-2 py-1 rounded hover:bg-purple-100 font-bold z-10"
-                                    >
-                                        COPIAR
-                                    </button>
-                                    {menuIA}
-                                </div>
-                            )}
-                        </>
-                      )}
-
-                      {/* Contenido Lista */}
-                      {tabIA === 'lista' && (
-                        <>
-                            <button 
-                                onClick={generarListaIA} 
-                                disabled={cargandoLista || !menuIA}
-                                className={`w-full py-3 rounded-xl font-bold text-xs transition shadow-lg flex justify-center items-center gap-2 mb-4 ${!menuIA ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-pink-600 hover:bg-pink-700 text-white shadow-pink-200 active:scale-95'}`}
-                            >
-                                {cargandoLista ? "🛒 Procesando..." : "📝 Crear Lista"}
-                            </button>
-                            
-                            {listaCompras && (
-                                <div className="bg-pink-50 p-3 rounded-xl border border-pink-100 text-xs text-slate-700 whitespace-pre-line leading-relaxed relative max-h-96 overflow-y-auto custom-scrollbar">
-                                    <button 
-                                        onClick={() => {navigator.clipboard.writeText(listaCompras); alert("Copiado!");}}
-                                        className="sticky top-0 float-right ml-2 mb-2 text-[9px] bg-white border border-pink-200 text-pink-600 px-2 py-1 rounded hover:bg-pink-100 font-bold z-10"
-                                    >
-                                        COPIAR
-                                    </button>
-                                    {listaCompras}
-                                </div>
-                            )}
-                        </>
-                      )}
-                  </div>
-              )}
           </div>
-        </section>
+
+          {/* RESPUESTA DE LA IA */}
+          {menuIA && (
+              <div className="bg-white p-5 rounded-xl border border-purple-100 text-sm text-slate-700 whitespace-pre-line shadow-inner leading-relaxed animate-in fade-in slide-in-from-bottom-2">
+                  {menuIA}
+              </div>
+          )}
       </div>
     </main>
   );

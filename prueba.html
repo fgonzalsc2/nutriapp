@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h2>🕵️‍♂️ Detective de API Key</h2>
+    <p>Pega tu llave aquí y presiona Probar:</p>
+    <input type="text" id="apiKey" placeholder="AIzaSy..." style="width: 300px;">
+    <button onclick="testKey()">Probar Llave</button>
+    <div id="result" style="margin-top: 20px; font-weight: bold;"></div>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+
+        window.testKey = async () => {
+            const key = document.getElementById('apiKey').value.trim();
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = "⏳ Probando...";
+            
+            try {
+                const genAI = new GoogleGenerativeAI(key);
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                const result = await model.generateContent("Di Hola si funcionas");
+                const response = await result.response;
+                resultDiv.innerHTML = "✅ ¡ÉXITO! Tu llave funciona. La respuesta fue: " + response.text();
+                resultDiv.style.color = "green";
+            } catch (error) {
+                resultDiv.innerHTML = "❌ ERROR: " + error.message;
+                resultDiv.style.color = "red";
+            }
+        }
+    </script>
+</body>
+</html>
