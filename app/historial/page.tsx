@@ -23,7 +23,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // --- CONFIGURACIÓN IA ---
-const GEN_AI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "TU_API_KEY_SI_NO_USAS_ENV"; 
+const GEN_AI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY|| "";
 const MODEL_NAME = "gemini-2.5-flash-lite"; // Usamos la versión Flash Lite más reciente disponible
 
 const ESTRATEGIAS_LABELS: Record<string, string> = {

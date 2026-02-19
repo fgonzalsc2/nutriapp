@@ -314,9 +314,9 @@ export default function Home() {
       3. Si hay "0 porciones" de algo en una comida, no lo incluyas.
       4. Formato de respuesta: Nombre del plato atractivo + Breve descripción de cómo usar los ingredientes asignados.`;
    
-      const API_KEY = "AIzaSyCgsceTHpNoBE9lBijN_luk0ZpBE7FT9R8";
+      const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
    
       try {
         const respuesta = await fetch(
@@ -362,7 +362,7 @@ export default function Home() {
       setCargandoLista(true);
       setTabIA('lista'); 
    
-      const API_KEY = "AIzaSyCgsceTHpNoBE9lBijN_luk0ZpBE7FT9R8"; 
+      const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || ""; 
       
       const prompt = `Actúa como un Asistente de Compras experto.
       Analiza este MENÚ NUTRICIONAL y crea una LISTA DE COMPRAS consolidada:
