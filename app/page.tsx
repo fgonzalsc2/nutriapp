@@ -1122,7 +1122,7 @@ ${firma}`;
             <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
               <Lock className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-white mb-1">NutriPlanner</h1>
+            <h1 className="text-2xl font-bold text-white mb-1">NutriPlannerIA</h1>
             <p className="text-blue-100 text-xs">Acceso Restringido</p>
           </div>
           
@@ -1187,7 +1187,7 @@ ${firma}`;
             {/* ENCABEZADO COMPACTO */}
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                 <div>
-                    <h1 className="font-black text-lg text-blue-700 leading-tight">NutriPlanner</h1>
+                    <h1 className="font-black text-lg text-blue-700 leading-tight">NutriPlannerIA</h1>
                     <p className="text-[10px] text-slate-400 font-medium">Panel Clínico Pro</p>
                 </div>
                 <Link href="/historial" className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors" title="Ver Historial">
