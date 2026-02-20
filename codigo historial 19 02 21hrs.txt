@@ -1,0 +1,336 @@
+"use client";
+import { useRouter } from "next/navigation"; 
+import { useState, useEffect } from "react";
+import { initializeApp } from "firebase/app";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { getFirestore, collection, getDocs, query, orderBy, doc, deleteDoc } from "firebase/firestore";
+import { GoogleGenerativeAI } from "@google/generative-ai"; // <--- IMPORTANTE: La IA de Google
+import Link from "next/link";
+import { Trash2, Search, ArrowLeft, FileText, Loader2, Calendar, Download, Activity, AlertTriangle, Clock, Send, Target, Settings, X, Save, Star, Camera, Sparkles, Copy } from "lucide-react";
+
+// --- CONFIGURACIÓN FIREBASE ---
+const firebaseConfig = {
+    apiKey: "AIzaSyCjeI7Om5Qqlxcga-O0k_jaqCL8cHbCaNk",
+    authDomain: "nutriapp-94e6b.firebaseapp.com",
+    projectId: "nutriapp-94e6b",
+    storageBucket: "nutriapp-94e6b.firebasestorage.app",
+    messagingSenderId: "403128573577",
+    appId: "1:403128573577:web:6548324a8c7e93db193058"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// --- CONFIGURACIÓN IA ---
+const GEN_AI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY|| "";
+const MODEL_NAME = "gemini-2.5-flash-lite"; // Usamos la versión Flash Lite más reciente disponible
+
+const ESTRATEGIAS_LABELS: Record<string, string> = {
+    equilibrada: "⚖️ Equilibrada", mediterranea: "🍅 Mediterránea", lowcarb: "🥩 Low Carb",
+    atleta: "⚡ Alto Rendimiento", definicion: "🔥 Definición", bariatrica: "💧 Bariátrica"
+};
+
+export default function HistorialPage() {
+    const router = useRouter(); 
+    const [user, setUser] = useState<any>(null);
+    const [pautas, setPautas] = useState<any[]>([]);
+    const [busqueda, setBusqueda] = useState("");
+    const [cargando, setCargando] = useState(true);
+
+    // --- ESTADOS DE CONFIGURACIÓN Y UI ---
+    const [config, setConfig] = useState({ meta: 1000000, valor: 35000 });
+    const [mostrarConfig, setMostrarConfig] = useState(false);
+    
+    // --- NUEVOS ESTADOS PARA IA (INSPECTOR DE PLATOS) ---
+    const [mostrarIA, setMostrarIA] = useState(false);
+    const [imagenIA, setImagenIA] = useState<File | null>(null);
+    const [previewIA, setPreviewIA] = useState<string | null>(null);
+    const [resultadoIA, setResultadoIA] = useState("");
+    const [cargandoIA, setCargandoIA] = useState(false);
+
+    // --- ESTADOS DASHBOARD ---
+    const [finanzas, setFinanzas] = useState({ actual: 0, porcentaje: 0, faltante: 0 });
+    const [stats, setStats] = useState({ pacientesMes: 0, inactivos: 0, topObjetivo: "General" });
+    const [pacienteRecuperar, setPacienteRecuperar] = useState<any>(null);
+
+    useEffect(() => {
+        const guardado = localStorage.getItem("nutri_config");
+        if (guardado) setConfig(JSON.parse(guardado));
+        
+        const unsubscribe = onAuthStateChanged(auth, (usuario) => {
+            if (usuario) { setUser(usuario); cargarMisDatos(usuario.email); } 
+            else { window.location.href = "/"; }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => { if (pautas.length > 0) procesarDashboard(pautas); }, [config]);
+
+    const cargarMisDatos = async (email: string | null) => {
+        if (!email) return;
+        setCargando(true);
+        try {
+            const q = query(collection(db, "pautas"), orderBy("fecha", "desc"));
+            const querySnapshot = await getDocs(q);
+            const datos = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter((doc: any) => doc.creadoPor === email || !doc.creadoPor); 
+            setPautas(datos);
+            procesarDashboard(datos); 
+        } catch (error) { console.error(error); }
+        setCargando(false);
+    };
+
+    const procesarDashboard = (data: any[]) => {
+        const hoy = new Date();
+        const mesActual = hoy.getMonth();
+        const anioActual = hoy.getFullYear();
+
+        const pacientesMes = data.filter(p => {
+            const d = new Date(p.fecha);
+            return d.getMonth() === mesActual && d.getFullYear() === anioActual;
+        }).length;
+
+        const dineroActual = pacientesMes * config.valor;
+        const porcentaje = Math.min(Math.round((dineroActual / config.meta) * 100), 100);
+        
+        const listaRiesgo: any[] = [];
+        const unicos = new Set();
+        data.forEach(p => {
+            if (unicos.has(p.paciente)) return;
+            unicos.add(p.paciente);
+            const dias = Math.floor((hoy.getTime() - new Date(p.fecha).getTime()) / (1000 * 3600 * 24));
+            if (dias > 30 && dias < 90) listaRiesgo.push(p);
+        });
+
+        const conteo: Record<string, number> = {};
+        let topObj = "General"; let max = 0;
+        data.forEach(p => { const o = p.objetivo || "bajar"; conteo[o] = (conteo[o]||0)+1; });
+        Object.entries(conteo).forEach(([k,v]) => { if(v>max){max=v; topObj=k;} });
+
+        setFinanzas({ actual: dineroActual, porcentaje, faltante: Math.max(0, config.meta - dineroActual) });
+        setStats({ pacientesMes, inactivos: listaRiesgo.length, topObjetivo: topObj === 'bajar' ? 'Pérdida Peso' : topObj });
+        setPacienteRecuperar(listaRiesgo.length > 0 ? listaRiesgo[0] : null);
+    };
+
+    // --- LÓGICA DE LA IA (GEMINI) ---
+    const handleImagenSeleccionada = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setImagenIA(file);
+            setPreviewIA(URL.createObjectURL(file));
+            setResultadoIA(""); // Limpiar resultado anterior
+        }
+    };
+
+    const analizarPlatoIA = async () => {
+        if (!imagenIA) return alert("Sube una foto primero");
+        setCargandoIA(true);
+
+        try {
+            // 1. Convertir imagen a Base64 para Gemini
+            const reader = new FileReader();
+            reader.readAsDataURL(imagenIA);
+            reader.onloadend = async () => {
+                const base64data = reader.result as string;
+                const imagePart = {
+                    inlineData: {
+                        data: base64data.split(",")[1],
+                        mimeType: imagenIA.type,
+                    },
+                };
+
+                // 2. Llamar a Gemini
+                const genAI = new GoogleGenerativeAI(GEN_AI_API_KEY);
+                const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+
+                const prompt = "Actúa como un Nutricionista Experto. Analiza esta foto de comida. 1. Identifica los alimentos principales. 2. Estima las calorías totales (aproximadas). 3. Da un veredicto nutricional breve (1 frase): ¿Es equilibrado? ¿Falta proteína? ¿Exceso de carbos? Sé directo y conciso.";
+
+                const result = await model.generateContent([prompt, imagePart]);
+                const response = await result.response;
+                setResultadoIA(response.text());
+                setCargandoIA(false);
+            };
+        } catch (error: any) {
+            console.error("Error detallado:", error);
+            // Esto mostrará el error real en la pantalla en lugar de quedarse cargando
+            setResultadoIA(`⚠️ Error: ${error.message || "No se pudo conectar con Gemini 2.5"}`);
+            setCargandoIA(false); // ¡IMPORTANTE! Esto apaga el spinner
+        }
+    };
+
+    const copiarResultado = () => {
+        navigator.clipboard.writeText(resultadoIA);
+        alert("¡Análisis copiado al portapapeles!");
+    };
+
+    // --- UTILS ---
+    const guardarConfiguracion = (e: any) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const nuevaConfig = { meta: Number(formData.get("meta")), valor: Number(formData.get("valor")) };
+        setConfig(nuevaConfig);
+        localStorage.setItem("nutri_config", JSON.stringify(nuevaConfig));
+        setMostrarConfig(false);
+    };
+
+    const enviarWsp = (nombre: string) => window.open(`https://wa.me/?text=${encodeURIComponent(`Hola ${nombre}, hace tiempo no te veo. ¿Cómo vas con la pauta?`)}`, '_blank');
+    const getEstrellas = (n:string) => { const c=pautas.filter(p=>p.paciente===n).length; return c>=3?<div className="flex text-yellow-400"><Star className="w-3 h-3 fill-current"/><Star className="w-3 h-3 fill-current"/></div>:null; };
+    const exportarExcel = () => { if(pautas.length===0)return; let c="\uFEFFsep=;\nFecha;Paciente;Calorias\n"; pautas.forEach(p=>{c+=`${p.fecha};${p.paciente};${p.caloriasMeta}\n`}); const l=document.createElement("a"); l.href=URL.createObjectURL(new Blob([c],{type:'text/csv'})); l.download="data.csv"; l.click(); };
+    const borrarPauta = async (id:string)=>{if(confirm("Borrar?")) {await deleteDoc(doc(db,"pautas",id)); const n=pautas.filter(p=>p.id!==id); setPautas(n); procesarDashboard(n);}};
+    const cargarEnCalculadora = (p:any)=>{localStorage.setItem("pauta_editar",JSON.stringify(p)); router.push("/");};
+    const getObjetivoBadge = (o:string)=> o==='bajar'?<span className="text-red-600 font-bold text-[10px] bg-red-50 px-2 py-1 rounded">DÉFICIT</span>:<span className="text-blue-600 font-bold text-[10px] bg-blue-50 px-2 py-1 rounded">MANTENCIÓN</span>;
+    const pautasFiltradas = pautas.filter(p => p.paciente.toLowerCase().includes(busqueda.toLowerCase()));
+
+    if (cargando) return <div className="min-h-screen flex items-center justify-center text-blue-600"><Loader2 className="animate-spin"/></div>;
+
+    return (
+        <div className="min-h-screen bg-slate-50 p-6 font-sans">
+            
+            {/* --- MODAL CONFIGURACIÓN --- */}
+            {mostrarConfig && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-slate-200">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-black text-slate-800 flex items-center gap-2"><Settings className="w-5 h-5 text-blue-600"/> Ajustar Metas</h3>
+                            <button onClick={() => setMostrarConfig(false)}><X className="w-5 h-5 text-slate-400"/></button>
+                        </div>
+                        <form onSubmit={guardarConfiguracion} className="space-y-4">
+                            <input name="meta" type="number" defaultValue={config.meta} className="w-full border rounded-xl p-3 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Meta Mensual"/>
+                            <input name="valor" type="number" defaultValue={config.valor} className="w-full border rounded-xl p-3 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Valor Consulta"/>
+                            <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2"><Save className="w-4 h-4"/> Guardar</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* --- MODAL IA (INSPECTOR) --- */}
+            {mostrarIA && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in zoom-in-95">
+                    <div className="bg-white rounded-3xl shadow-2xl p-0 w-full max-w-md border border-slate-200 overflow-hidden relative">
+                        <div className="bg-gradient-to-r from-violet-600 to-indigo-600 p-6 text-white">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h3 className="font-black text-lg flex items-center gap-2"><Sparkles className="w-5 h-5 text-yellow-300"/> Inspector de Platos IA</h3>
+                                    <p className="text-xs text-indigo-100 opacity-80 mt-1">Sube la foto del paciente para auditarla.</p>
+                                </div>
+                                <button onClick={() => setMostrarIA(false)} className="bg-white/20 hover:bg-white/30 p-1.5 rounded-full transition"><X className="w-5 h-5"/></button>
+                            </div>
+                        </div>
+                        
+                        <div className="p-6 space-y-4">
+                            {/* Area de Carga de Imagen */}
+                            {!previewIA ? (
+                                <label className="border-2 border-dashed border-slate-300 rounded-2xl h-48 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 hover:border-violet-400 transition group">
+                                    <Camera className="w-10 h-10 text-slate-300 group-hover:text-violet-500 mb-2 transition"/>
+                                    <span className="text-sm font-bold text-slate-400 group-hover:text-violet-600">Clic para subir foto</span>
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleImagenSeleccionada} />
+                                </label>
+                            ) : (
+                                <div className="relative h-48 w-full bg-black rounded-2xl overflow-hidden group">
+                                    <img src={previewIA} alt="Plato" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition" />
+                                    <button onClick={() => {setPreviewIA(null); setResultadoIA("");}} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-red-500 transition"><X className="w-4 h-4"/></button>
+                                </div>
+                            )}
+
+                            {/* Resultado */}
+                            {resultadoIA && (
+                                <div className="bg-violet-50 p-4 rounded-xl border border-violet-100 text-sm text-slate-700 animate-in slide-in-from-bottom-2">
+                                    <p className="whitespace-pre-line leading-relaxed">{resultadoIA}</p>
+                                    <button onClick={copiarResultado} className="mt-3 text-xs font-bold text-violet-600 flex items-center gap-1 hover:underline"><Copy className="w-3 h-3"/> Copiar texto para WhatsApp</button>
+                                </div>
+                            )}
+
+                            {/* Botón de Acción */}
+                            {previewIA && !resultadoIA && (
+                                <button 
+                                    onClick={analizarPlatoIA} 
+                                    disabled={cargandoIA}
+                                    className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition disabled:opacity-50"
+                                >
+                                    {cargandoIA ? <><Loader2 className="w-4 h-4 animate-spin"/> Analizando con Gemini...</> : <><Sparkles className="w-4 h-4"/> Analizar Ahora</>}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="max-w-6xl mx-auto space-y-6">
+                
+                {/* 1. BARRA DE META */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-100"><div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-1000" style={{ width: `${finanzas.porcentaje}%` }}></div></div>
+                    <button onClick={() => setMostrarConfig(true)} className="absolute top-4 right-4 p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all"><Settings className="w-5 h-5" /></button>
+                    <div className="flex flex-col md:flex-row justify-between items-end mt-2 gap-4">
+                        <div>
+                            <Link href="/" className="text-slate-400 hover:text-blue-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-1 mb-2 transition"><ArrowLeft className="w-3 h-3" /> Volver</Link>
+                            <h1 className="text-4xl font-black text-slate-800 tracking-tight flex items-baseline gap-2">${finanzas.actual.toLocaleString('es-CL')}<span className="text-sm text-slate-400 font-medium">/ Meta: ${config.meta.toLocaleString('es-CL')}</span></h1>
+                            <p className="text-xs text-slate-500 mt-1 font-medium">{finanzas.faltante > 0 ? `🔥 Faltan ${Math.ceil(finanzas.faltante / config.valor)} consultas.` : "🎉 ¡Meta superada!"}</p>
+                        </div>
+                        <div className="flex gap-2">
+                             {/* BOTÓN MAGICO DE IA AQUI */}
+                             <button onClick={() => setMostrarIA(true)} className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:shadow-lg hover:shadow-violet-200 transition flex items-center gap-2 animate-pulse">
+                                <Sparkles className="w-4 h-4 text-yellow-300" /> Analizar Foto IA
+                            </button>
+                             <button onClick={exportarExcel} className="bg-white border border-slate-200 text-slate-600 px-3 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 transition flex items-center gap-2"><Download className="w-4 h-4" /> Excel</button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 2. TARJETAS DE KPIs */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                        <div className="p-3 bg-blue-50 rounded-xl text-blue-600"><Activity className="w-6 h-6" /></div>
+                        <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Consultas Mes</p><h3 className="text-2xl font-black text-slate-800">{stats.pacientesMes}</h3></div>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                        <div className="p-3 bg-purple-50 rounded-xl text-purple-600"><Target className="w-6 h-6" /></div>
+                        <div><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Foco Principal</p><h3 className="text-xl font-black text-slate-800 leading-none">{stats.topObjetivo}</h3></div>
+                    </div>
+                    <div className={`p-5 rounded-2xl shadow-sm border flex items-center gap-4 transition relative overflow-hidden ${stats.inactivos > 0 ? 'bg-white border-red-200' : 'bg-white border-slate-100'}`}>
+                        {stats.inactivos > 0 && <div className="absolute right-0 top-0 bg-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-lg">ACCIÓN</div>}
+                        <div className={`p-3 rounded-xl ${stats.inactivos > 0 ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}>{stats.inactivos > 0 ? <AlertTriangle className="w-6 h-6" /> : <Clock className="w-6 h-6" />}</div>
+                        <div className="flex-1">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inactivos (+30 días)</p>
+                            <h3 className="text-2xl font-black text-slate-800">{stats.inactivos}</h3>
+                            {stats.inactivos > 0 && pacienteRecuperar && (
+                                <button onClick={() => enviarWsp(pacienteRecuperar.paciente)} className="mt-1 text-[10px] font-bold text-red-500 hover:bg-red-50 px-2 py-1 rounded transition flex items-center gap-1 w-fit">Recuperar a {pacienteRecuperar.paciente.split(' ')[0]} <Send className="w-3 h-3" /></button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* 3. TABLA */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText className="w-4 h-4 text-slate-400" /> Historial Clínico</h3>
+                        <div className="relative w-64"><Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" /><input type="text" placeholder="Buscar..." className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-100" value={busqueda} onChange={(e) => setBusqueda(e.target.value)}/></div>
+                    </div>
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            <tr><th className="p-4">Paciente</th><th className="p-4">Fecha</th><th className="p-4 text-center">Calorías</th><th className="p-4 text-center">Objetivo</th><th className="p-4 text-right">Acciones</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-sm">
+                            {pautasFiltradas.length > 0 ? (
+                                pautasFiltradas.map((p) => (
+                                    <tr key={p.id} className="hover:bg-blue-50/30 transition">
+                                        <td className="p-4"><div className="font-bold text-slate-800 flex items-center gap-2">{p.paciente} {getEstrellas(p.paciente)}</div><span className="text-[10px] text-slate-400 italic">{ESTRATEGIAS_LABELS[p.estrategia] || "Personalizada"}</span></td>
+                                        <td className="p-4 text-xs text-slate-500"><div className="flex items-center gap-1"><Calendar className="w-3 h-3"/> {new Date(p.fecha).toLocaleDateString()}</div></td>
+                                        <td className="p-4 text-center"><span className="bg-slate-100 px-2 py-1 rounded font-mono font-bold text-slate-600">{Math.round(p.caloriasMeta)}</span></td>
+                                        <td className="p-4 text-center">{getObjetivoBadge(p.objetivo)}</td>
+                                        <td className="p-4 text-right flex justify-end gap-2">
+                                            <button onClick={() => cargarEnCalculadora(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded transition" title="Editar"><FileText className="w-4 h-4"/></button>
+                                            <button onClick={() => borrarPauta(p.id)} className="p-2 text-red-400 hover:bg-red-50 rounded transition" title="Eliminar"><Trash2 className="w-4 h-4"/></button>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr><td colSpan={5} className="p-10 text-center text-slate-400 italic">No se encontraron pacientes...</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+}
